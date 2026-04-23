@@ -1,5 +1,6 @@
 use std::io::{ErrorKind, Read, Write};
 use std::sync::mpsc;
+use std::sync::mpsc::TryRecvError;
 use std::thread;
 use std::time::Duration;
 
@@ -47,18 +48,25 @@ pub fn start_serial_thread(app: AppHandle, rx: mpsc::Receiver<HostToPico>) {
         }
 
         if let Some(port) = current_port.as_mut() {
-            if let Ok(cmd) = rx.try_recv() {
-                let mut buf = [0u8; 64];
-                if let Ok(slice) = postcard::to_slice(&cmd, &mut buf) {
-                    if let Err(e) = port.write_all(slice).and_then(|_| port.flush()) {
-                        println!("Send error: {}", e);
-                        let _ = app.emit("pico-connection", false);
-                        current_port = None;
-                        current_port_name = None;
-                        accumulator.clear();
-                        thread::sleep(Duration::from_millis(500));
-                        continue;
+            match rx.try_recv() {
+                Ok(cmd) => {
+                    let mut buf = [0u8; 64];
+                    if let Ok(slice) = postcard::to_slice(&cmd, &mut buf) {
+                        if let Err(e) = port.write_all(slice).and_then(|_| port.flush()) {
+                            println!("Send error: {}", e);
+                            let _ = app.emit("pico-connection", false);
+                            current_port = None;
+                            current_port_name = None;
+                            accumulator.clear();
+                            thread::sleep(Duration::from_millis(500));
+                            continue;
+                        }
                     }
+                }
+                Err(TryRecvError::Empty) => {}
+                Err(TryRecvError::Disconnected) => {
+                    println!("Serial service stopping: command channel closed");
+                    break;
                 }
             }
 

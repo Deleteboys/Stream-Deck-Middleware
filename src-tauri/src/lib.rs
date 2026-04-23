@@ -2,20 +2,21 @@
 mod protocol;
 mod serial;
 
+use std::sync::mpsc;
+use std::sync::Mutex;
+use std::thread;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{TrayIconBuilder, TrayIconEvent},
-    Manager, WindowEvent, State
+    AppHandle, Manager, RunEvent, State, WindowEvent,
 };
-use std::sync::Mutex;
-use std::sync::mpsc;
-use std::thread;
 
 use crate::protocol::HostToPico;
 
 // State, um vom UI Befehle an den Hintergrund-Thread zu schicken
 struct AppState {
     serial_tx: Mutex<Option<mpsc::Sender<HostToPico>>>,
+    is_quitting: Mutex<bool>,
 }
 
 // Der Command, den dein JavaScript aufruft
@@ -30,17 +31,47 @@ fn send_to_pico(state: State<AppState>, command: HostToPico) -> Result<(), Strin
     }
 }
 
+fn shutdown_app(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    if let Ok(mut quitting) = state.is_quitting.lock() {
+        *quitting = true;
+    }
+
+    // Sender droppen, damit der Serial-Thread uber "Disconnected" sauber aussteigt.
+    if let Ok(mut tx_guard) = state.serial_tx.lock() {
+        tx_guard.take();
+    }
+
+    app.exit(0);
+}
+
+fn show_or_create_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    } else {
+        let _ = tauri::WebviewWindowBuilder::new(
+            app,
+            "main",
+            tauri::WebviewUrl::App("index.html".into()),
+        )
+        .title("Mein Programm")
+        .build();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Channel für den seriellen Thread erstellen
+    // Channel fur den seriellen Thread erstellen
     let (tx, rx) = mpsc::channel::<HostToPico>();
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         // 1. AppState registrieren, damit `send_to_pico` darauf zugreifen kann
         .manage(AppState {
             serial_tx: Mutex::new(Some(tx)),
+            is_quitting: Mutex::new(false),
         })
-        // 2. Den Command für das Frontend registrieren
+        // 2. Den Command fur das Frontend registrieren
         .invoke_handler(tauri::generate_handler![send_to_pico])
         .setup(|app| {
             // --- TRAY MENU SETUP ---
@@ -53,23 +84,21 @@ pub fn run() {
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "quit" => {
-                        app.exit(0);
+                        shutdown_app(app);
                     }
                     "show" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
+                        show_or_create_main_window(app);
                     }
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, .. } = event {
+                    if let TrayIconEvent::Click {
+                        button: tauri::tray::MouseButton::Left,
+                        ..
+                    } = event
+                    {
                         let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
+                        show_or_create_main_window(&app);
                     }
                 })
                 .build(app)?;
@@ -81,7 +110,7 @@ pub fn run() {
             });
 
             // --- FENSTER LOGIK ---
-            let should_show_gui = true; // Placeholder für Settings
+            let should_show_gui = true; // Placeholder fur Settings
             if !should_show_gui {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.hide();
@@ -92,11 +121,21 @@ pub fn run() {
         })
         .on_window_event(|window, event| match event {
             WindowEvent::CloseRequested { api, .. } => {
-                window.hide().unwrap();
                 api.prevent_close();
+                let _ = window.destroy();
             }
             _ => {}
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|app, event| {
+        if let RunEvent::ExitRequested { api, .. } = event {
+            let state = app.state::<AppState>();
+            let should_exit = state.is_quitting.lock().map(|v| *v).unwrap_or(false);
+            if !should_exit {
+                api.prevent_exit();
+            }
+        }
+    });
 }
