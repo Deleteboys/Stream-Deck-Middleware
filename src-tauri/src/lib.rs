@@ -1,6 +1,7 @@
 // Modul-Deklarationen einbinden
 mod protocol;
 mod serial;
+pub mod action; // Das bindet den Ordner "action" über die mod.rs ein
 
 use serde::{Deserialize, Serialize};
 use std::fs;
