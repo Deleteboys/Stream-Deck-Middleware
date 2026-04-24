@@ -13,9 +13,7 @@
             class="encoder"
             @click="store.selectElement('enc-' + (n-1))"
         >
-          <div :class="['encoder-inner', { active: store.selectedElementId === 'enc-' + (n-1) }]">
-            <div class="encoder-notch"></div>
-          </div>
+          <div :class="['encoder-inner', { active: store.selectedElementId === 'enc-' + (n-1) }]"></div>
         </div>
       </div>
 
@@ -47,44 +45,38 @@
   border: 1px solid rgba(255, 255, 255, 0.05) !important;
 }
 
-/* Drehregler (Alu-Look wie auf dem Foto) */
+/* Drehregler Styling */
 .encoder {
-  width: 60px;
-  height: 60px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
-  background: conic-gradient(#3f3f46, #18181b, #3f3f46);
+  background: linear-gradient(145deg, #3f3f46, #18181b);
   border: 2px solid #000;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  transition: transform 0.1s;
+}
+
+.encoder:active {
+  transform: translateY(2px);
 }
 
 .encoder-inner {
-  width: 100%;
-  height: 100%;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
+  background: #09090b;
+  border: 1px solid #27272a;
   transition: all 0.2s;
 }
 
 .encoder-inner.active {
-  box-shadow: inset 0 0 0 3px #3b82f6, 0 0 15px rgba(59, 130, 246, 0.5);
+  background: #3b82f6;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);
+  border-color: #60a5fa;
 }
-
-.encoder-notch {
-  position: absolute;
-  top: 6px;
-  width: 3px;
-  height: 10px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 2px;
-}
-
 /* Button Grid (4 Spalten, 2 Zeilen) */
 .button-grid {
   display: grid;

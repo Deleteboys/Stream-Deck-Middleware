@@ -1,30 +1,35 @@
 <template>
-  <div class="oled-container">
-    <div class="oled-header">
-      {{ store.activeProfile?.name || 'NO PROFILE' }}
-    </div>
+  <div class="oled-wrapper">
+    <div class="oled-container">
+      <div class="oled-header">
+        {{ store.activeProfile?.name || 'PROFIL: MAIN' }}
+      </div>
 
-    <div class="oled-divider-h"></div>
+      <div class="oled-divider-h"></div>
 
-    <div class="oled-content">
-      <div
-          v-for="(segment, i) in segments"
-          :key="i"
-          class="oled-segment"
-          :class="{ 'with-divider': i > 0 }"
-      >
-        <div class="icon-grid">
-          <div v-for="(row, ri) in segment.iconMatrix" :key="ri" class="icon-row">
-            <div
-                v-for="(pixel, pi) in row"
-                :key="pi"
-                :class="['pixel', { on: pixel === '1' }]"
-            ></div>
+      <div class="oled-content">
+        <div
+            v-for="(segment, i) in segments"
+            :key="i"
+            class="oled-segment"
+        >
+          <div v-if="i > 0" class="oled-divider-v"></div>
+
+          <div class="segment-inner">
+            <div class="icon-grid">
+              <div v-for="(row, ri) in segment.iconMatrix" :key="ri" class="icon-row">
+                <div
+                    v-for="(pixel, pi) in row"
+                    :key="pi"
+                    :class="['pixel', { on: pixel === '1' }]"
+                ></div>
+              </div>
+            </div>
+
+            <div class="volume-text">
+              {{ store.activeProfile?.keys[`enc-${i}`]?.value ?? VOLUMES[i] }}%
+            </div>
           </div>
-        </div>
-
-        <div class="volume-text">
-          {{ store.activeProfile?.keys[`enc-${i}`]?.value ?? 50 }}%
         </div>
       </div>
     </div>
@@ -37,49 +42,77 @@ import { useStreamDeckStore } from '@/stores/streamdeck';
 
 const store = useStreamDeckStore();
 
-// Die Icons aus deinem Rust-Code konvertiert
+// Fallback Daten wie im Rust Code
+const VOLUMES = [50, 65, 80, 35];
+
 const ICONS = {
-  MASTER: ["00000000000000","00000001100000","00000011100000","00000111100010","00011111100011","00011111100111","00011111100111","00011111100111","00011111100111","00011111100011","00000111100010","00000011100000","00000001100000","00000000000000"],
-  SPOTIFY: ["000000000000","000011111100","001111111111","011111111111","011000000011","111111111111","111100001111","111111111111","011110001110","011111111111","001111111111","000011111100","000000000000","000000000000"],
-  DISCORD: ["000000000000","000000000000","000000000000","000110011000","001111111100","011111111110","011011110110","011011110110","011111111110","001110011100","000110011000","000000000000","000000000000","000000000000"],
-  BROWSER: ["00000000000000","00000111110000","00011100011100","00111000001110","01110000000111","01110001111111","01110001111111","01110000000000","01110000000000","00111000001100","00011111111100","00000111110000","00000000000000","00000000000000"]
+  MASTER: [
+    "              ", "       11     ", "      111     ", "     1111   1 ",
+    "   111111   11", "   111111  111", "   111111  111", "   111111  111",
+    "   111111  111", "   111111   11", "     1111   1 ", "      111     ",
+    "       11     ", "              "
+  ],
+  SPOTIFY: [
+    "            ", "    111111   ", "  1111111111 ", " 111111111111",
+    " 11        11", "11111111111111", "1111      1111", "11111111111111",
+    " 1111    1111", " 111111111111", "  1111111111 ", "    111111   ",
+    "            ", "            "
+  ],
+  DISCORD: [
+    "            ", "            ", "            ", "   11  11   ",
+    "  11111111  ", " 1111111111 ", " 11 1111 11 ", " 11 1111 11 ",
+    " 1111111111 ", "  111  111  ", "   11  11   ", "            ",
+    "            ", "            "
+  ],
+  BROWSER: [
+    "              ", "     11111    ", "   111   111  ", "  111     111 ",
+    " 111       111", " 111   1111111", " 111   1111111", " 111          ",
+    " 111          ", "  111     11  ", "   111111111  ", "     11111    ",
+    "              ", "              "
+  ]
 };
 
 const segments = computed(() => {
-  const iconKeys = ['MASTER', 'SPOTIFY', 'DISCORD', 'BROWSER'];
+  const iconKeys = ['MASTER', 'SPOTIFY', 'DISCORD', 'BROWSER'] as const;
   return iconKeys.map(key => ({
-    iconMatrix: ICONS[key as keyof typeof ICONS].map(row => row.split(''))
+    iconMatrix: ICONS[key].map(row => row.split(''))
   }));
 });
 </script>
 
 <style scoped>
+/* Wrapper jetzt ohne Hintergrund und Padding */
+.oled-wrapper {
+  display: inline-block;
+}
+
 .oled-container {
-  width: 256px; /* 128px * 2 für bessere Sichtbarkeit */
+  width: 256px; /* 128px * 2 */
   height: 128px; /* 64px * 2 */
   background-color: #000;
   color: #fff;
   font-family: 'Courier New', Courier, monospace;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   border: 4px solid #333;
   image-rendering: pixelated;
-  user-select: none;
 }
 
+/* ... Rest des CSS bleibt gleich ... */
+
 .oled-header {
-  height: 32px; /* Entspricht den ersten 16px im Rust Code */
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  font-weight: bold;
-  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 .oled-divider-h {
-  height: 2px;
-  border-top: 2px dashed #444;
+  height: 0;
+  border-top: 2px dashed #555;
 }
 
 .oled-content {
@@ -90,26 +123,32 @@ const segments = computed(() => {
 .oled-segment {
   flex: 1;
   display: flex;
+  position: relative;
+}
+
+.oled-divider-v {
+  width: 0;
+  height: 80%;
+  align-self: center;
+  border-left: 2px dashed #555;
+}
+
+.segment-inner {
+  flex: 1;
+  display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-around;
-  padding: 4px 0;
+  justify-content: space-evenly;
+  padding: 5px 0;
 }
 
-.oled-segment.with-divider {
-  border-left: 2px dashed #444;
-}
-
-/* Icon Pixel Rendering */
 .icon-grid {
   display: flex;
   flex-direction: column;
-  gap: 0;
 }
 
 .icon-row {
   display: flex;
-  gap: 0;
 }
 
 .pixel {
@@ -120,7 +159,7 @@ const segments = computed(() => {
 
 .pixel.on {
   background-color: #fff;
-  box-shadow: 0 0 2px rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 1px #fff;
 }
 
 .volume-text {
