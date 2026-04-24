@@ -1,14 +1,25 @@
 import { createApp } from "vue";
-import { createPinia } from "pinia"; // 1. Pinia importieren
+import { createPinia } from "pinia";
 import App from "./App.vue";
 import vuetify from './plugins/vuetify';
-import router from './router'; // 2. Deinen Router importieren
+import router, { getRestorableRoute } from './router';
 
 const app = createApp(App);
-const pinia = createPinia(); // 3. Pinia Instanz erstellen
+const pinia = createPinia();
 
-app.use(pinia);   // Zuerst den Store
-app.use(router);  // Dann den Router
-app.use(vuetify); // Dann das UI-Framework
+app.use(pinia);
+app.use(router);
+app.use(vuetify);
 
-app.mount('#app');
+const mountApp = async () => {
+  await router.isReady();
+
+  const lastRoute = getRestorableRoute();
+  if (lastRoute && router.currentRoute.value.path !== lastRoute) {
+    await router.replace(lastRoute).catch(() => undefined);
+  }
+
+  app.mount('#app');
+};
+
+void mountApp();
