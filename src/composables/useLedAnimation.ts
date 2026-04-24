@@ -15,7 +15,11 @@ export function useLedAnimation(getLedConfig: () => any) {
     const chase_period_frames = (speed: number) => 2 + Math.floor(((255 - speed) * 78) / 255);
     const comet_period_frames = (speed: number) => 1 + Math.floor(((255 - speed) * 39) / 255);
     const orbit_period_frames = (speed: number) => 1 + Math.floor(((255 - speed) * 18) / 255);
-    const scale = (component: number, brightness: number) => Math.floor((component * brightness) / 255);
+    const scale = (component: number, brightness: number) => {
+        // Wir wenden Gamma auf die Helligkeit an, bevor wir skalieren
+        const correctedBrightness = gammaCorrect(brightness);
+        return Math.floor((component * correctedBrightness) / 255);
+    };
     const smoothstep8 = (x: number) => { let x32 = x; return Math.floor((x32 * x32 * (765 - 2 * x32)) / 65025); };
     const smooth_wave8 = (phase: number) => { let tri = phase < 128 ? phase * 2 : (255 - phase) * 2; return smoothstep8(tri); };
     const lerp8 = (a: number, b: number, t: number) => Math.floor(a + ((b - a) * t) / 255);
@@ -39,8 +43,20 @@ export function useLedAnimation(getLedConfig: () => any) {
         }
     };
 
+    const gammaCorrect = (value: number) => {
+        return Math.floor(Math.pow(value / 255, 1 / 2.2) * 255);
+    };
+
+// Optional: Verbessere applyBrightness für sattere Farben
     const applyBrightness = (r: number, g: number, b: number, brightness: number) => {
-        return { r: scale(r, brightness), g: scale(g, brightness), b: scale(b, brightness) };
+        // Damit Farben bei niedriger Helligkeit nicht "dreckig" wirken,
+        // stellen wir sicher, dass sie eine gewisse Leuchtkraft behalten
+        const factor = gammaCorrect(brightness) / 255;
+        return {
+            r: Math.round(r * factor),
+            g: Math.round(g * factor),
+            b: Math.round(b * factor)
+        };
     };
 
     const renderLoop = () => {
@@ -60,7 +76,8 @@ export function useLedAnimation(getLedConfig: () => any) {
             case 'Rainbow':
                 let base_hue = (frame * speed_step(speed)) % 256;
                 for (let i = 0; i < NUM_LEDS; i++) {
-                    let col = hsv_to_rgb((base_hue + Math.floor((i * 256) / NUM_LEDS)) % 256, 255, 255);
+                    // MINUS statt PLUS: Schiebt die Farbwelle von Index 0 nach oben
+                    let col = hsv_to_rgb((base_hue - Math.floor((i * 256) / NUM_LEDS) + 256) % 256, 255, 255);
                     leds[i] = applyBrightness(col.r, col.g, col.b, brightness);
                 }
                 break;
@@ -91,7 +108,8 @@ export function useLedAnimation(getLedConfig: () => any) {
             case 'Aurora':
                 let ashift = (frame * speed_step(speed)) % 256;
                 for (let i = 0; i < NUM_LEDS; i++) {
-                    let col = hsv_to_rgb((ashift + (i * 17)) % 256, 200, 255);
+                    // Auch hier: Minus beim Index-Offset (i * 17)
+                    let col = hsv_to_rgb((ashift - (i * 17) + 256) % 256, 200, 255);
                     leds[i] = applyBrightness(col.r, col.g, col.b, brightness);
                 }
                 break;
@@ -99,7 +117,8 @@ export function useLedAnimation(getLedConfig: () => any) {
                 let orot = Math.floor(frame / orbit_period_frames(speed)) % 256;
                 for (let i = 0; i < NUM_LEDS; i++) {
                     let offset = Math.floor((i * 256) / NUM_LEDS);
-                    let cur_hue = (hue + scale(hue_shift, smooth_wave8((orot + offset) % 256))) % 256;
+                    // Änderung: orot - offset sorgt für den Fluss von links nach rechts
+                    let cur_hue = (hue + scale(hue_shift, smooth_wave8((orot - offset + 256) % 256))) % 256;
                     let col = hsv_to_rgb(cur_hue, saturation, 255);
                     leds[i] = applyBrightness(col.r, col.g, col.b, brightness);
                 }
@@ -108,7 +127,8 @@ export function useLedAnimation(getLedConfig: () => any) {
                 let arot = Math.floor((frame * 3) / orbit_period_frames(speed)) % 256;
                 let phase_span = 64 + Math.floor((spread * 320) / 255);
                 for (let i = 0; i < NUM_LEDS; i++) {
-                    let aphase = (arot + Math.floor((i * phase_span) / NUM_LEDS)) % 256;
+                    // Änderung: arot - offset
+                    let aphase = (arot - Math.floor((i * phase_span) / NUM_LEDS) + 256) % 256;
                     let ahue = lerp8(236, 150, smooth_wave8(aphase));
                     let aval = Math.min(255, 90 + scale(165, smooth_wave8((aphase + arot) % 256)));
                     let col = hsv_to_rgb(ahue, saturation, aval);
@@ -118,6 +138,7 @@ export function useLedAnimation(getLedConfig: () => any) {
         }
 
         const c = leds.map(l => `rgb(${l.r}, ${l.g}, ${l.b})`);
+
         leftGrad.value = `linear-gradient(to bottom, ${c[0]}, ${c[1]}, ${c[2]}, ${c[3]})`;
         bottomGrad.value = `linear-gradient(to right, ${c[3]}, ${c[4]}, ${c[5]}, ${c[6]}, ${c[7]}, ${c[8]})`;
         rightGrad.value = `linear-gradient(to top, ${c[8]}, ${c[9]}, ${c[10]}, ${c[11]}, ${c[12]})`;
