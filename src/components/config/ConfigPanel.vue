@@ -22,8 +22,13 @@
           class="mb-4"
       ></v-select>
 
-      <div v-if="hasStepConfig" class="mb-4">
-        <div class="text-caption text-grey mb-1">Lautstärke-Intervall (Step): {{ localStep > 0 ? '+' : '' }}{{ localStep }}%</div>
+      <div v-if="hasStepConfig" class="mb-4 pa-3 bg-zinc-800 rounded-lg border border-primary-darken-1">
+        <div class="text-caption text-primary mb-1 font-weight-bold">
+          WERTE ANPASSEN: {{ selectedTriggerDisplayName }}
+        </div>
+        <div class="text-caption text-grey mb-1">
+          Intervall: {{ localStep > 0 ? '+' : '' }}{{ localStep }}%
+        </div>
         <v-slider
             v-model="localStep"
             :min="-50"
@@ -45,7 +50,7 @@
       </div>
 
       <div class="pa-4 bg-black rounded-lg border border-zinc-700 mb-6">
-        <div class="text-caption text-grey mb-3">Zugewiesene Aktionen:</div>
+        <div class="text-caption text-grey mb-3">Zugewiesene Aktionen (Klicken zum Bearbeiten):</div>
 
         <div v-if="boundActionsList.length === 0" class="text-body-2 text-grey-darken-1 text-center py-2">
           Noch keine Aktionen zugewiesen.
@@ -54,15 +59,26 @@
         <div
             v-for="item in boundActionsList"
             :key="item.triggerValue"
-            class="d-flex justify-space-between align-center mb-2 pa-2 bg-zinc-900 rounded border border-zinc-800"
+            @click="selectedTriggerType = item.triggerValue"
+            :class="[
+              'd-flex justify-space-between align-center mb-2 pa-2 rounded border cursor-pointer transition-swing',
+              selectedTriggerType === item.triggerValue
+                ? 'bg-primary-darken-4 border-primary'
+                : 'bg-zinc-900 border-zinc-800 hover-zinc-800'
+            ]"
         >
           <div class="d-flex align-center">
-            <v-icon :icon="item.icon" color="primary" class="mr-3" size="small"></v-icon>
+            <v-icon
+                :icon="item.icon"
+                :color="selectedTriggerType === item.triggerValue ? 'primary' : 'grey'"
+                class="mr-3"
+                size="small"
+            ></v-icon>
             <div>
               <div class="text-caption text-grey" style="line-height: 1.2;">{{ item.triggerName }}</div>
-              <div class="text-body-2">
+              <div class="text-body-2" :class="{'text-primary font-weight-bold': selectedTriggerType === item.triggerValue}">
                 {{ item.actionName }}
-                <span v-if="item.step !== undefined" class="text-primary">({{ item.step > 0 ? '+' : '' }}{{ item.step }}%)</span>
+                <span v-if="item.step !== undefined">({{ item.step > 0 ? '+' : '' }}{{ item.step }}%)</span>
               </div>
             </div>
           </div>
@@ -71,7 +87,7 @@
               color="error"
               variant="text"
               icon="mdi-delete"
-              @click="unbindSpecificAction(item.triggerValue)"
+              @click.stop="unbindSpecificAction(item.triggerValue)"
           ></v-btn>
         </div>
       </div>
@@ -143,6 +159,8 @@ const triggerDisplayNames: Record<string, string> = {
   'PushTurnRight': 'Drücken + Rechts', 'PushTurnLeft': 'Drücken + Links', 'PushPress': 'Nur Drücken'
 };
 
+const selectedTriggerDisplayName = computed(() => triggerDisplayNames[selectedTriggerType.value] || selectedTriggerType.value);
+
 const hasStepConfig = computed(() => {
   const currentAction = store.activeProfile?.keys[store.selectedElementId!]?.actions?.[selectedTriggerType.value];
   return currentAction?.config && 'step' in currentAction.config;
@@ -162,19 +180,16 @@ const boundActionsList = computed(() => {
   }));
 });
 
-// --- HIER IST DIE FUNKTION JETZT OBEN ---
 const syncLocalStep = () => {
-  const currentAction = store.activeProfile?.keys[store.selectedElementId!]?.actions?.[selectedTriggerType.value];
+  if (!store.selectedElementId) return;
+  const currentAction = store.activeProfile?.keys[store.selectedElementId]?.actions?.[selectedTriggerType.value];
   if (currentAction?.config && 'step' in currentAction.config) {
-    // FEHLERBEHEBUNG: .value statt .ref
     localStep.value = currentAction.config.step;
   } else {
-    // Standardwerte basierend auf Drehrichtung vorschlagen
     localStep.value = selectedTriggerType.value.includes('Left') ? -5 : 5;
   }
 };
 
-// --- DANN DIE WATCHER ---
 watch(() => store.selectedElementId, (newId) => {
   if (newId) {
     buttonLabel.value = store.activeProfile?.keys[newId]?.label || '';
@@ -187,19 +202,19 @@ watch(selectedTriggerType, () => {
   syncLocalStep();
 });
 
-// --- RESTLICHE FUNKTIONEN ---
 const updateActionStep = async () => {
-  const currentAction = store.activeProfile?.keys[store.selectedElementId!]?.actions?.[selectedTriggerType.value];
+  if (!store.selectedElementId) return;
+  const currentAction = store.activeProfile?.keys[store.selectedElementId]?.actions?.[selectedTriggerType.value];
   if (currentAction) {
     const updatedConfig = { ...currentAction.config, step: localStep.value };
 
-    store.updateElementAction(store.selectedElementId!, selectedTriggerType.value, {
+    store.updateElementAction(store.selectedElementId, selectedTriggerType.value, {
       ...currentAction,
       config: updatedConfig
     });
 
     try {
-      await updateActionMapping(store.selectedElementId!, selectedTriggerType.value, updatedConfig);
+      await updateActionMapping(store.selectedElementId, selectedTriggerType.value, updatedConfig);
     } catch (e) { console.error(e); }
   }
 };
@@ -247,5 +262,14 @@ const unbindSpecificAction = async (triggerToDelete: TriggerType) => {
 }
 .action-card:hover:not(.v-list-item--disabled) {
   border-color: #3b82f6;
+}
+.cursor-pointer {
+  cursor: pointer;
+}
+.hover-zinc-800:hover {
+  background-color: #27272a !important;
+}
+.transition-swing {
+  transition: all 0.2s ease-in-out;
 }
 </style>
