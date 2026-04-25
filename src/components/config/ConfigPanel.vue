@@ -22,6 +22,20 @@
           class="mb-4"
       ></v-select>
 
+      <div v-if="hasKeyConfig" class="mb-4 pa-3 bg-zinc-800 rounded-lg border border-primary-darken-1">
+        <div class="text-caption text-primary mb-2 font-weight-bold">
+          TASTE WÄHLEN: {{ selectedTriggerDisplayName }}
+        </div>
+        <v-select
+            v-model="localKey"
+            :items="fKeys"
+            label="Funktionstaste"
+            variant="underlined"
+            density="compact"
+            @update:modelValue="updateActionKey"
+        ></v-select>
+      </div>
+
       <div v-if="hasStepConfig" class="mb-4 pa-3 bg-zinc-800 rounded-lg border border-primary-darken-1">
         <div class="text-caption text-primary mb-1 font-weight-bold">
           WERTE ANPASSEN: {{ selectedTriggerDisplayName }}
@@ -79,6 +93,7 @@
               <div class="text-body-2" :class="{'text-primary font-weight-bold': selectedTriggerType === item.triggerValue}">
                 {{ item.actionName }}
                 <span v-if="item.step !== undefined">({{ item.step > 0 ? '+' : '' }}{{ item.step }}%)</span>
+                <span v-if="item.key !== undefined">({{ item.key }})</span>
               </div>
             </div>
           </div>
@@ -126,11 +141,16 @@ import { updateActionMapping, removeActionMapping, type TriggerType } from '@/se
 const store = useStreamDeckStore();
 const buttonLabel = ref('');
 const selectedTriggerType = ref<TriggerType>('ShortPress');
+
+// Lokale Variablen für die Editoren
 const localStep = ref(5);
+const localKey = ref('F13');
+
+// Generiert das Array ['F13', 'F14', ... 'F24']
+const fKeys = Array.from({ length: 12 }, (_, i) => `F${i + 13}`);
 
 const actionsLibrary = [
-  { title: 'Taste F14 drücken', icon: 'mdi-keyboard', config: { type: 'PressKey', key: 'F14' } },
-  { title: 'Taste F15 drücken', icon: 'mdi-keyboard', config: { type: 'PressKey', key: 'F15' } },
+  { title: 'Taste drücken', icon: 'mdi-keyboard', config: { type: 'PressKey', key: 'F13' } },
   { title: 'Spotify Volume', icon: 'mdi-spotify', config: { type: 'SpotifyVolume', step: 5 } },
   { title: 'Master Volume', icon: 'mdi-volume-high', config: { type: 'MasterVolume', step: 5 } },
   { title: 'Audio Toggle', icon: 'mdi-swap-horizontal', config: { type: 'ToggleAudio', device1: 'HyperX', device2: 'Speakers' } }
@@ -161,9 +181,16 @@ const triggerDisplayNames: Record<string, string> = {
 
 const selectedTriggerDisplayName = computed(() => triggerDisplayNames[selectedTriggerType.value] || selectedTriggerType.value);
 
+// Prüft, ob ein Step-Editor angezeigt werden soll
 const hasStepConfig = computed(() => {
   const currentAction = store.activeProfile?.keys[store.selectedElementId!]?.actions?.[selectedTriggerType.value];
   return currentAction?.config && 'step' in currentAction.config;
+});
+
+// Prüft, ob ein Tasten-Editor angezeigt werden soll
+const hasKeyConfig = computed(() => {
+  const currentAction = store.activeProfile?.keys[store.selectedElementId!]?.actions?.[selectedTriggerType.value];
+  return currentAction?.config && 'key' in currentAction.config;
 });
 
 const boundActionsList = computed(() => {
@@ -176,17 +203,26 @@ const boundActionsList = computed(() => {
     triggerName: triggerDisplayNames[triggerValue] || triggerValue,
     actionName: setup?.action || 'Unbekannt',
     icon: setup?.icon || 'mdi-help',
-    step: setup?.config?.step
+    step: setup?.config?.step,
+    key: setup?.config?.key
   }));
 });
 
-const syncLocalStep = () => {
+// Synchronisiert die UI-Felder (Slider, Dropdown) mit den Werten der ausgewählten Aktion
+const syncLocalVariables = () => {
   if (!store.selectedElementId) return;
   const currentAction = store.activeProfile?.keys[store.selectedElementId]?.actions?.[selectedTriggerType.value];
+
   if (currentAction?.config && 'step' in currentAction.config) {
     localStep.value = currentAction.config.step;
   } else {
     localStep.value = selectedTriggerType.value.includes('Left') ? -5 : 5;
+  }
+
+  if (currentAction?.config && 'key' in currentAction.config) {
+    localKey.value = currentAction.config.key;
+  } else {
+    localKey.value = 'F13';
   }
 };
 
@@ -194,12 +230,12 @@ watch(() => store.selectedElementId, (newId) => {
   if (newId) {
     buttonLabel.value = store.activeProfile?.keys[newId]?.label || '';
     selectedTriggerType.value = newId.startsWith('enc-') ? 'TurnRight' : 'ShortPress';
-    syncLocalStep();
+    syncLocalVariables();
   }
 }, { immediate: true });
 
 watch(selectedTriggerType, () => {
-  syncLocalStep();
+  syncLocalVariables();
 });
 
 const updateActionStep = async () => {
@@ -207,6 +243,23 @@ const updateActionStep = async () => {
   const currentAction = store.activeProfile?.keys[store.selectedElementId]?.actions?.[selectedTriggerType.value];
   if (currentAction) {
     const updatedConfig = { ...currentAction.config, step: localStep.value };
+
+    store.updateElementAction(store.selectedElementId, selectedTriggerType.value, {
+      ...currentAction,
+      config: updatedConfig
+    });
+
+    try {
+      await updateActionMapping(store.selectedElementId, selectedTriggerType.value, updatedConfig);
+    } catch (e) { console.error(e); }
+  }
+};
+
+const updateActionKey = async () => {
+  if (!store.selectedElementId) return;
+  const currentAction = store.activeProfile?.keys[store.selectedElementId]?.actions?.[selectedTriggerType.value];
+  if (currentAction) {
+    const updatedConfig = { ...currentAction.config, key: localKey.value };
 
     store.updateElementAction(store.selectedElementId, selectedTriggerType.value, {
       ...currentAction,
@@ -228,9 +281,10 @@ const saveChanges = () => {
 const assignAction = async (action: any) => {
   if (store.selectedElementId) {
     const config = { ...action.config };
-    if ('step' in config) {
-      config.step = localStep.value;
-    }
+
+    // Übernehme direkt die aktuellen Werte aus den UI-Editoren, falls zutreffend
+    if ('step' in config) config.step = localStep.value;
+    if ('key' in config) config.key = localKey.value;
 
     store.updateElementAction(store.selectedElementId, selectedTriggerType.value, {
       action: action.title,

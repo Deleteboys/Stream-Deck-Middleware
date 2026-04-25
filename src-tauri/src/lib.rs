@@ -307,11 +307,30 @@ pub struct UnmapPayload {
 
 // Hilfsfunktion: Wandelt String in Enigo-Key um
 fn parse_key(key_str: &str) -> enigo::Key {
-    match key_str.to_uppercase().as_str() {
-        "F14" => enigo::Key::F14,
-        "F15" => enigo::Key::F15,
+    let key_upper = key_str.to_uppercase();
+
+    if key_upper.starts_with('F') {
+        if let Ok(num) = key_upper[1..].parse::<u8>() {
+            return match num {
+                13 => enigo::Key::F13,
+                14 => enigo::Key::F14,
+                15 => enigo::Key::F15,
+                16 => enigo::Key::F16,
+                17 => enigo::Key::F17,
+                18 => enigo::Key::F18,
+                19 => enigo::Key::F19,
+                20 => enigo::Key::F20,
+                21 => enigo::Key::F21,
+                22 => enigo::Key::F22,
+                23 => enigo::Key::F23,
+                24 => enigo::Key::F24,
+                _ => enigo::Key::Return, // Fallback
+            };
+        }
+    }
+
+    match key_upper.as_str() {
         "A" => enigo::Key::Unicode('a'),
-        // ...
         _ => enigo::Key::Return,
     }
 }
