@@ -253,7 +253,7 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| match event {
-            WindowEvent::CloseRequested { api, .. } => {
+            WindowEvent::CloseRequested { .. } => {
                 if let Some(webview_window) = window.app_handle().get_webview_window(window.label())
                 {
                     persist_window_state(&webview_window);
@@ -262,9 +262,8 @@ pub fn run() {
                 if is_quitting(&window.app_handle()) {
                     return;
                 }
-
-                api.prevent_close();
-                let _ = window.hide();
+                // Nicht nur verstecken: WebView wirklich schließen, damit keine UI-Ressourcen mehr laufen.
+                // ExitRequested wird unten bereits abgefangen, sodass die Tray-App weiterlebt.
             }
             WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
                 if let Some(webview_window) = window.app_handle().get_webview_window(window.label())
