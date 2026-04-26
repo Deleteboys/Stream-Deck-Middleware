@@ -5,7 +5,7 @@ import {
   syncActionMappings,
   type ActionConfig,
   type LedEffectCommand,
-  type TriggerType
+  type TriggerType, setIconSlot
 } from '@/services/streamdeckCommands'
 import type { DeviceConfig } from '@/services/streamdeckCommands'
 
@@ -132,6 +132,23 @@ export const useStreamDeckStore = defineStore('streamdeck', {
       }
     },
 
+    async syncOledIconsToBackend() {
+      const slots = this.activeProfile?.keys['oled-display']?.slots;
+      if (!slots) return;
+
+      for (let i = 0; i < slots.length; i++) {
+        try {
+          await setIconSlot(i, slots[i].icon);
+
+          // NEU: Dem Pico 50ms Zeit geben, um den Befehl zu verarbeiten
+          await new Promise(resolve => setTimeout(resolve, 50));
+
+        } catch (e) {
+          console.error(`Fehler beim Sync von Slot ${i}:`, e);
+        }
+      }
+    },
+
     async syncActiveProfileMappingsToBackend() {
       if (!this.activeProfile) return
 
@@ -154,8 +171,12 @@ export const useStreamDeckStore = defineStore('streamdeck', {
       await syncActionMappings(mappings)
     },
 
-    setDeviceConnected(isConnected: boolean) {
+    async setDeviceConnected(isConnected: boolean) {
       this.isDeviceConnected = isConnected
+      if (isConnected) {
+        console.log("Gerät verbunden - starte Voll-Sync...");
+        // await this.syncOledIconsToBackend();
+      }
     },
 
     setProfile(id: number) {
@@ -190,6 +211,17 @@ export const useStreamDeckStore = defineStore('streamdeck', {
 
       this.activeProfile.keys[id].actions![trigger] = setup
       this.persistState()
+    },
+
+    updateOledSlots(slots: any[]) {
+      if (!this.activeProfile) return;
+
+      if (!this.activeProfile.keys['oled-display']) {
+        this.activeProfile.keys['oled-display'] = {};
+      }
+
+      this.activeProfile.keys['oled-display'].slots = JSON.parse(JSON.stringify(slots));
+      this.persistState(); // Speichert es im localStorage (für Restart)
     },
 
     clearElementAction(id: string | null, trigger: TriggerType) {

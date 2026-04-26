@@ -52,7 +52,7 @@
                 hide-details
                 placeholder="Kein Prozess (Standard)"
                 class="text-white"
-                @update:model-value="updateOledConfig"
+                @update:model-value="handleConfigChange"
             ></v-autocomplete>
           </div>
 
@@ -69,14 +69,13 @@ import { getActiveProcesses, setIconSlot } from '@/services/streamdeckCommands';
 
 const store = useStreamDeckStore();
 
+const activeProcesses = ref<string[]>([]);
 const oledSlots = ref([
   { icon: 'MASTER', process: '' },
   { icon: 'SPOTIFY', process: '' },
   { icon: 'DISCORD', process: '' },
   { icon: 'BROWSER', process: '' }
 ]);
-
-const activeProcesses = ref<string[]>([]);
 
 const fetchProcesses = async () => {
   try {
@@ -87,10 +86,8 @@ const fetchProcesses = async () => {
   }
 };
 
-const updateOledConfig = () => {
-  if (!store.activeProfile) return;
-  if (!store.activeProfile.keys['oled-display']) store.activeProfile.keys['oled-display'] = {};
-  store.activeProfile.keys['oled-display'].slots = JSON.parse(JSON.stringify(oledSlots.value));
+const handleConfigChange = () => {
+  store.updateOledSlots(oledSlots.value);
 };
 
 /**
@@ -99,7 +96,7 @@ const updateOledConfig = () => {
  * 2. Sendet den neuen Icon-Typ für den spezifischen Slot an den Pico.
  */
 const handleIconChange = async (index: number, newIcon: string) => {
-  updateOledConfig();
+  handleConfigChange(); // Lokal speichern
 
   try {
     // index entspricht dem Slot (0-3) auf dem Pico
