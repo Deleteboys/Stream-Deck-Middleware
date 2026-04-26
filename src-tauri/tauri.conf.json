@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "StreamDock Settings",
+        "title": "StreamDeck Settings",
         "width": 1280,
         "height": 720,
         "label": "main",

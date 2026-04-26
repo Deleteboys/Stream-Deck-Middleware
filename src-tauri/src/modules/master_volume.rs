@@ -1,6 +1,5 @@
 use crate::action::actions::Action;
 use std::fmt::Debug;
-use windows::core::Interface;
 use windows::Win32::Media::Audio::*;
 use windows::Win32::Media::Audio::Endpoints::*;
 use windows::Win32::System::Com::*;
