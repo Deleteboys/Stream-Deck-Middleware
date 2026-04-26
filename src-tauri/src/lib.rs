@@ -384,29 +384,8 @@ fn create_action(config: ActionConfig) -> Box<dyn action::actions::Action> {
 
 #[tauri::command]
 fn update_mapping(state: State<AppState>, payload: MappingPayload) -> Result<(), String> {
-    // 1. String-ID (z.B. "btn-0") in eine Zahl (0) umwandeln
-    let is_button = payload.element_id.starts_with("btn-");
-    let id_str = payload.element_id.replace("btn-", "").replace("enc-", "");
-    let id: u8 = id_str.parse().unwrap_or(0);
-
-    // 2. Den logischen Trigger bauen
-    let trigger = if is_button {
-        let event = match payload.trigger_type.as_str() {
-            "LongPress" => ButtonEvent::LongPress,
-            "DoublePress" => ButtonEvent::DoublePress,
-            _ => ButtonEvent::ShortPress, // Fallback
-        };
-        HardwareTrigger::Button { id, event }
-    } else {
-        let event = match payload.trigger_type.as_str() {
-            "TurnLeft" => EncoderEvent::TurnLeft,
-            "TurnRight" => EncoderEvent::TurnRight,
-            // ... weitere Encoder events
-            _ => EncoderEvent::PushPress,
-        };
-        HardwareTrigger::Encoder { id, event }
-    };
-
+    // Nutze die vollständige Hilfsfunktion anstatt die Logik neu zu schreiben
+    let trigger = trigger_from_payload(&payload.element_id, &payload.trigger_type)?;
     let action = create_action(payload.action_config);
 
     if let Ok(mut manager) = state.action_manager.lock() {
@@ -414,28 +393,11 @@ fn update_mapping(state: State<AppState>, payload: MappingPayload) -> Result<(),
     }
     Ok(())
 }
+
 #[tauri::command]
 fn remove_mapping(state: State<AppState>, payload: UnmapPayload) -> Result<(), String> {
-    let is_button = payload.element_id.starts_with("btn-");
-    let id_str = payload.element_id.replace("btn-", "").replace("enc-", "");
-    let id: u8 = id_str.parse().unwrap_or(0);
-
-    // Den Trigger genau wie beim Speichern zusammenbauen
-    let trigger = if is_button {
-        let event = match payload.trigger_type.as_str() {
-            "LongPress" => ButtonEvent::LongPress,
-            "DoublePress" => ButtonEvent::DoublePress,
-            _ => ButtonEvent::ShortPress,
-        };
-        HardwareTrigger::Button { id, event }
-    } else {
-        let event = match payload.trigger_type.as_str() {
-            "TurnLeft" => EncoderEvent::TurnLeft,
-            "TurnRight" => EncoderEvent::TurnRight,
-            _ => EncoderEvent::PushPress,
-        };
-        HardwareTrigger::Encoder { id, event }
-    };
+    // Nutze auch hier die vollständige Hilfsfunktion
+    let trigger = trigger_from_payload(&payload.element_id, &payload.trigger_type)?;
 
     // Mapping aus dem Manager löschen
     if let Ok(mut manager) = state.action_manager.lock() {
