@@ -80,7 +80,8 @@ const activeProcesses = ref<string[]>([]);
 
 const fetchProcesses = async () => {
   try {
-    activeProcesses.value = await getActiveProcesses();
+    const processes = await getActiveProcesses();
+    activeProcesses.value = ['Windows Master Volume', ...processes];
   } catch (error) {
     console.error("Prozesse konnten nicht geladen werden:", error);
   }
