@@ -185,6 +185,9 @@ const editingStepTrigger = ref<TriggerType | null>(null);
 const activeProcesses = ref<string[]>([]);
 const fKeys = Array.from({ length: 12 }, (_, i) => `F${i + 13}`);
 
+const ENCODER_ORDER: TriggerType[] = ['TurnRight', 'TurnLeft', 'PushTurnRight', 'PushTurnLeft', 'PushPress'];
+const BUTTON_ORDER: TriggerType[] = ['ShortPress', 'DoublePress', 'LongPress'];
+
 const actionsLibrary = [
   { title: 'Taste drücken', icon: 'mdi-keyboard', config: { type: 'PressKey', key: 'F13' } },
   { title: 'Spotify Volume', icon: 'mdi-spotify', config: { type: 'SpotifyVolume', step: 5 } },
@@ -218,11 +221,11 @@ const boundActionsList = computed(() => {
   const actionsMap = store.activeProfile?.keys[store.selectedElementId]?.actions;
   if (!actionsMap) return [];
 
-  return Object.entries(actionsMap).map(([triggerValue, setup]) => {
+  // 1. Erst die Map in ein Array umwandeln
+  const list = Object.entries(actionsMap).map(([triggerValue, setup]) => {
     const config = setup?.config;
     const type = config?.type;
 
-    // Logik für die Anzeige der Felder
     const hasStep = config && 'step' in config;
     const hasKey = config && 'key' in config;
     const needsProcess = type === 'ToggleAppAudio' || type === 'AppVolume';
@@ -240,6 +243,14 @@ const boundActionsList = computed(() => {
       process_name: config?.process_name,
       hasSettings
     };
+  });
+
+  // 2. Das Array sortieren
+  const isEncoder = store.selectedElementId.startsWith('enc-');
+  const order = isEncoder ? ENCODER_ORDER : BUTTON_ORDER;
+
+  return list.sort((a, b) => {
+    return order.indexOf(a.triggerValue) - order.indexOf(b.triggerValue);
   });
 });
 
