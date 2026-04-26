@@ -26,23 +26,6 @@ impl InputTracker {
         match event {
             PicoToHost::ButtonChanged { id, pressed } => {
                 let id_usize = id as usize;
-
-                // --- Ist es der Encoder-Button? ---
-                // (Du musst wissen, welche IDs deine Encoder-Buttons haben.
-                // Angenommen Encoder 0 hat Button ID 10)
-                if id == 10 {
-                    self.encoder_pushed[0] = pressed;
-                    if !pressed {
-                        // Der Push an sich wurde losgelassen
-                        return Some(HardwareTrigger::Encoder {
-                            id: 0,
-                            event: EncoderEvent::PushPress
-                        });
-                    }
-                    return None;
-                }
-
-                // --- Normale Buttons ---
                 if pressed {
                     self.button_press_times[id_usize] = Some(Instant::now());
 
@@ -74,6 +57,16 @@ impl InputTracker {
                     }
                     None
                 }
+            }
+            PicoToHost::EncoderChanged {id,pressed} => {
+                    self.encoder_pushed[id as usize] = pressed;
+                    if !pressed {
+                        return Some(HardwareTrigger::Encoder {
+                            id,
+                            event: EncoderEvent::PushPress
+                        });
+                    }
+                    None
             }
             PicoToHost::EncoderTurned { id, delta } => {
                 let is_pushed = self.encoder_pushed[id as usize];

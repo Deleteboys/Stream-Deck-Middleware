@@ -136,6 +136,7 @@ pub enum HostToPico {
 pub enum PicoToHost {
     Hello,
     EncoderTurned { id: u8, delta: i8 },
+    EncoderChanged { id: u8, pressed: bool},
     ButtonChanged { id: u8, pressed: bool },
     Config { config: DeviceConfig },
     ConfigSaved,

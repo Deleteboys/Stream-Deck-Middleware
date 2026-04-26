@@ -1,51 +1,25 @@
 <template>
   <div class="oled-wrapper">
-    <div class="oled-container">
-      <div class="oled-header">
-        {{ store.activeProfile?.name || 'PROFIL: MAIN' }}
-      </div>
-
-      <div class="oled-divider-h"></div>
-
-      <div class="oled-content">
-        <div
-            v-for="(segment, i) in segments"
-            :key="i"
-            class="oled-segment"
-        >
-          <div v-if="i > 0" class="oled-divider-v"></div>
-
-          <div class="segment-inner">
-            <div class="icon-grid">
-              <div v-for="(row, ri) in segment.iconMatrix" :key="ri" class="icon-row">
-                <div
-                    v-for="(pixel, pi) in row"
-                    :key="pi"
-                    :class="['pixel', { on: pixel === '1' }]"
-                ></div>
-              </div>
-            </div>
-
-            <div class="volume-text">
-              {{ store.activeProfile?.keys[`enc-${i}`]?.value ?? VOLUMES[i] }}%
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <canvas
+        ref="oledCanvas"
+        width="128"
+        height="64"
+        class="oled-canvas"
+    ></canvas>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, onMounted, watchEffect } from 'vue';
 import { useStreamDeckStore } from '@/stores/streamdeck';
 
 const store = useStreamDeckStore();
+const oledCanvas = ref<HTMLCanvasElement | null>(null);
 
-// Fallback Daten wie im Rust Code
+// Fallback-Daten
 const VOLUMES = [50, 65, 80, 35];
 
-const ICONS = {
+const ICONS: Record<string, string[]> = {
   MASTER: [
     "              ", "       11     ", "      111     ", "     1111   1 ",
     "   111111   11", "   111111  111", "   111111  111", "   111111  111",
@@ -72,98 +46,219 @@ const ICONS = {
   ]
 };
 
-const segments = computed(() => {
-  const iconKeys = ['MASTER', 'SPOTIFY', 'DISCORD', 'BROWSER'] as const;
-  return iconKeys.map(key => ({
-    iconMatrix: ICONS[key].map(row => row.split(''))
-  }));
+// Exakter Port des 5x7 Fonts aus dem Rust Code
+const FONT_5X7: Record<string, number[]> = {
+  ' ': [0x00, 0x00, 0x00, 0x00, 0x00],
+  '%': [0x23, 0x13, 0x08, 0x64, 0x62],
+  '-': [0x08, 0x08, 0x08, 0x08, 0x08],
+  ':': [0x00, 0x00, 0x24, 0x00, 0x00],
+  '0': [0x3e, 0x51, 0x49, 0x45, 0x3e],
+  '1': [0x00, 0x42, 0x7f, 0x40, 0x00],
+  '2': [0x42, 0x61, 0x51, 0x49, 0x46],
+  '3': [0x21, 0x41, 0x45, 0x4b, 0x31],
+  '4': [0x18, 0x14, 0x12, 0x7f, 0x10],
+  '5': [0x27, 0x45, 0x45, 0x45, 0x39],
+  '6': [0x3c, 0x4a, 0x49, 0x49, 0x30],
+  '7': [0x01, 0x71, 0x09, 0x05, 0x03],
+  '8': [0x36, 0x49, 0x49, 0x49, 0x36],
+  '9': [0x06, 0x49, 0x49, 0x29, 0x1e],
+
+  'A': [0x7e, 0x11, 0x11, 0x11, 0x7e],
+  'B': [0x7f, 0x49, 0x49, 0x49, 0x36],
+  'C': [0x3e, 0x41, 0x41, 0x41, 0x22],
+  'D': [0x7f, 0x41, 0x41, 0x22, 0x1c],
+  'E': [0x7f, 0x49, 0x49, 0x49, 0x41],
+  'F': [0x7f, 0x09, 0x09, 0x09, 0x01],
+  'G': [0x3e, 0x41, 0x49, 0x49, 0x7a],
+  'H': [0x7f, 0x08, 0x08, 0x08, 0x7f],
+  'I': [0x00, 0x41, 0x7f, 0x41, 0x00],
+  'J': [0x20, 0x40, 0x41, 0x3f, 0x01],
+  'K': [0x7f, 0x08, 0x14, 0x22, 0x41],
+  'L': [0x7f, 0x40, 0x40, 0x40, 0x40],
+  'M': [0x7f, 0x02, 0x04, 0x02, 0x7f],
+  'N': [0x7f, 0x04, 0x08, 0x10, 0x7f],
+  'O': [0x3e, 0x41, 0x41, 0x41, 0x3e],
+  'P': [0x7f, 0x09, 0x09, 0x09, 0x06],
+  'Q': [0x3e, 0x41, 0x51, 0x21, 0x5e],
+  'R': [0x7f, 0x09, 0x19, 0x29, 0x46],
+  'S': [0x46, 0x49, 0x49, 0x49, 0x31],
+  'T': [0x01, 0x01, 0x7f, 0x01, 0x01],
+  'U': [0x3f, 0x40, 0x40, 0x40, 0x3f],
+  'V': [0x1f, 0x20, 0x40, 0x20, 0x1f],
+  'W': [0x3f, 0x40, 0x38, 0x40, 0x3f],
+  'X': [0x63, 0x14, 0x08, 0x14, 0x63],
+  'Y': [0x03, 0x04, 0x78, 0x04, 0x03],
+  'Z': [0x61, 0x51, 0x49, 0x45, 0x43],
+};
+const FONT_DEFAULT = [0x00, 0x00, 0x5f, 0x00, 0x00];
+
+// Framebuffer Render-Logik
+const renderDisplay = () => {
+  if (!oledCanvas.value) return;
+  const ctx = oledCanvas.value.getContext('2d');
+  if (!ctx) return;
+
+  const DISPLAY_WIDTH = 128;
+  const DISPLAY_HEIGHT = 64;
+
+  // Wir nutzen einen Uint8ClampedArray als echten Framebuffer (RGBA)
+  const buffer = new Uint8ClampedArray(DISPLAY_WIDTH * DISPLAY_HEIGHT * 4);
+
+  // Hilfsfunktion um ein Pixel in den Buffer zu schreiben
+  const putPixel = (x: number, y: number, on: boolean) => {
+    if (x < 0 || x >= DISPLAY_WIDTH || y < 0 || y >= DISPLAY_HEIGHT) return;
+    const index = (y * DISPLAY_WIDTH + x) * 4;
+    const color = on ? 255 : 0;
+    buffer[index] = color;     // R
+    buffer[index + 1] = color; // G
+    buffer[index + 2] = color; // B
+    buffer[index + 3] = 255;   // Alpha (immer voll deckend, da OLED)
+  };
+
+  // Hintergrund komplett leeren (schwarz)
+  for (let i = 0; i < buffer.length; i += 4) {
+    buffer[i] = 0; buffer[i+1] = 0; buffer[i+2] = 0; buffer[i+3] = 255;
+  }
+
+  // Text Zeichnen (Analog zum Rust Code)
+  const drawText = (col: number, page: number, text: string, on: boolean) => {
+    let cursor = col;
+    for (let i = 0; i < text.length; i++) {
+      if (cursor + 6 > DISPLAY_WIDTH) break;
+      const char = text[i].toUpperCase();
+      const glyph = FONT_5X7[char] || FONT_DEFAULT;
+
+      for (let dx = 0; dx < glyph.length; dx++) {
+        const bits = glyph[dx];
+        for (let dy = 0; dy < 7; dy++) {
+          if ((bits >> dy) & 1) {
+            putPixel(cursor + dx, page * 8 + dy, on);
+          }
+        }
+      }
+      cursor += 6;
+    }
+  };
+
+  const drawTextCenteredInRange = (page: number, text: string, xMin: number, xMax: number, on: boolean) => {
+    const glyphW = 6;
+    const textW = text.length * glyphW;
+    const rangeW = Math.max(0, xMax - xMin + 1);
+    const startX = xMin + Math.floor(Math.max(0, rangeW - textW) / 2);
+    drawText(startX, page, text, on);
+  };
+
+  // Linien zeichnen
+  const drawDashedHLine = (y: number, xStart: number, xEnd: number, dashLen: number, on: boolean) => {
+    let x = xStart;
+    while (x <= xEnd) {
+      for (let d = 0; d < dashLen; d++) {
+        if (x + d <= xEnd) putPixel(x + d, y, on);
+      }
+      x += dashLen * 2;
+    }
+  };
+
+  const drawDashedVLine = (x: number, yStart: number, yEnd: number, dashLen: number, gapLen: number, on: boolean) => {
+    let y = yStart;
+    while (y <= yEnd) {
+      for (let d = 0; d < dashLen; d++) {
+        if (y + d <= yEnd) putPixel(x, y + d, on);
+      }
+      y += dashLen + gapLen;
+    }
+  };
+
+  // Icon zeichnen
+  const drawIcon = (x: number, y: number, iconData: string[], on: boolean) => {
+    for (let row = 0; row < iconData.length; row++) {
+      const line = iconData[row];
+      for (let col = 0; col < line.length; col++) {
+        if (line[col] === '1') {
+          putPixel(x + col, y + row, on);
+        }
+      }
+    }
+  };
+
+
+  /* --- START DER EIGENTLICHEN RENDER-LOGIK --- */
+
+  // 1. Profilname
+  const profileName = store.activeProfile?.name || 'MAIN';
+  drawTextCenteredInRange(0, profileName.toUpperCase(), 0, DISPLAY_WIDTH - 1, true);
+
+  // 2. Horizontale Trennlinie
+  drawDashedHLine(10, 0, DISPLAY_WIDTH - 1, 2, true);
+
+  const segmentWidth = Math.floor(DISPLAY_WIDTH / 4);
+  const iconKeys = ['MASTER', 'SPOTIFY', 'DISCORD', 'BROWSER'];
+
+  for (let i = 0; i < 4; i++) {
+    const xStart = i * segmentWidth;
+    const iconX = xStart + 9;
+    const iconY = 20;
+
+    // 3. Vertikale Trennlinien
+    if (i > 0) {
+      drawDashedVLine(xStart, 15, DISPLAY_HEIGHT - 1, 1, 2, true);
+    }
+
+    // 4. Icon zeichnen
+    const iconKey = iconKeys[i];
+    drawIcon(iconX, iconY, ICONS[iconKey], true);
+
+    // 5. Mute-X (falls gemutet)
+    const isMuted = store.activeProfile?.keys[`enc-${i}`]?.muted ?? false;
+    if (isMuted) {
+      for (let d = 0; d < 14; d++) {
+        putPixel(iconX + d, iconY + d, true);
+        if (d < 13) putPixel(iconX + d + 1, iconY + d, true);
+
+        putPixel(iconX + 13 - d, iconY + d, true);
+        if (d > 0) putPixel(iconX + 13 - d - 1, iconY + d, true);
+      }
+    }
+
+    // 6. Lautstärketext (Page 6)
+    const volume = store.activeProfile?.keys[`enc-${i}`]?.value ?? VOLUMES[i];
+    let volStr = "---";
+    if (volume !== 255) {
+      volStr = `${volume}%`;
+    }
+
+    drawTextCenteredInRange(6, volStr, xStart, xStart + segmentWidth - 1, true);
+  }
+
+  // Framebuffer auf das Canvas anwenden
+  const imageData = new ImageData(buffer, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+  ctx.putImageData(imageData, 0, 0);
+};
+
+// Canvas initial rendern und auf Store-Änderungen reagieren
+onMounted(() => {
+  renderDisplay();
+});
+
+watchEffect(() => {
+  // Sobald sich Daten im Store ändern, wird das Canvas neu gezeichnet
+  renderDisplay();
 });
 </script>
 
 <style scoped>
-/* Wrapper jetzt ohne Hintergrund und Padding */
 .oled-wrapper {
   display: inline-block;
 }
 
-.oled-container {
-  width: 256px; /* 128px * 2 */
-  height: 128px; /* 64px * 2 */
+.oled-canvas {
+  width: 256px;   /* Exakt 128px * 2 */
+  height: 128px;  /* Exakt 64px * 2 */
   background-color: #000;
-  color: #fff;
-  font-family: 'Courier New', Courier, monospace;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
   border: 4px solid #333;
+  /* WICHTIG: Das hier hält die Pixel beim Skalieren knackscharf */
   image-rendering: pixelated;
-}
-
-/* ... Rest des CSS bleibt gleich ... */
-
-.oled-header {
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  text-transform: uppercase;
-}
-
-.oled-divider-h {
-  height: 0;
-  border-top: 2px dashed #555;
-}
-
-.oled-content {
-  flex: 1;
-  display: flex;
-}
-
-.oled-segment {
-  flex: 1;
-  display: flex;
-  position: relative;
-}
-
-.oled-divider-v {
-  width: 0;
-  height: 80%;
-  align-self: center;
-  border-left: 2px dashed #555;
-}
-
-.segment-inner {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-evenly;
-  padding: 5px 0;
-}
-
-.icon-grid {
-  display: flex;
-  flex-direction: column;
-}
-
-.icon-row {
-  display: flex;
-}
-
-.pixel {
-  width: 2px;
-  height: 2px;
-  background-color: transparent;
-}
-
-.pixel.on {
-  background-color: #fff;
-  box-shadow: 0 0 1px #fff;
-}
-
-.volume-text {
-  font-size: 16px;
-  font-weight: bold;
+  image-rendering: crisp-edges;
+  display: block;
 }
 </style>

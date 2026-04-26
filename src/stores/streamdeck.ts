@@ -48,9 +48,8 @@ type PersistedState = {
 const STORAGE_KEY = 'streamdeck-state-v1'
 
 const DEFAULT_PROFILES: Profile[] = [
-  { id: 0, name: 'Main (Desktop)', keys: {} },
-  { id: 1, name: 'Gaming', keys: {} },
-  { id: 2, name: 'Streaming', keys: {} }
+  { id: 0, name: 'Main', keys: {} },
+  { id: 1, name: 'Profile 2', keys: {} },
 ]
 
 const isValidPersistedState = (value: unknown): value is PersistedState => {
