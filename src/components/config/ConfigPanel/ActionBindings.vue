@@ -131,7 +131,7 @@
             ></v-slider>
           </div>
 
-          <div v-if="item.isToggleApp" class="mt-1">
+          <div v-if="item.needsProcess" class="mt-3">
             <div class="d-flex justify-space-between align-center mb-1">
               <div class="text-body-2 text-grey">Prozess auswählen</div>
               <v-btn
@@ -190,6 +190,7 @@ const actionsLibrary = [
   { title: 'Spotify Volume', icon: 'mdi-spotify', config: { type: 'SpotifyVolume', step: 5 } },
   { title: 'Master Volume', icon: 'mdi-volume-high', config: { type: 'MasterVolume', step: 5 } },
   { title: 'Audio Toggle', icon: 'mdi-swap-horizontal', config: { type: 'ToggleAudio', device1: 'HyperX', device2: 'Speakers' } },
+  { title: 'App Audio (Volume)', icon: 'mdi-volume-plus', config: { type: 'AppVolume', process_name: '', step: 5 } }, // NEU
   { title: 'App Audio (Toggle)', icon: 'mdi-volume-off', config: { type: 'ToggleAppAudio', process_name: '' } },
   { title: 'Global Mute (Toggle)', icon: 'mdi-volume-mute', config: { type: 'ToggleMasterMute' } }
 ];
@@ -218,17 +219,25 @@ const boundActionsList = computed(() => {
   if (!actionsMap) return [];
 
   return Object.entries(actionsMap).map(([triggerValue, setup]) => {
-    const hasSettings = setup?.config && ('step' in setup.config || 'key' in setup.config || setup.config.type === 'ToggleAppAudio');
+    const config = setup?.config;
+    const type = config?.type;
+
+    // Logik für die Anzeige der Felder
+    const hasStep = config && 'step' in config;
+    const hasKey = config && 'key' in config;
+    const needsProcess = type === 'ToggleAppAudio' || type === 'AppVolume';
+    const hasSettings = hasStep || hasKey || needsProcess;
+
     return {
       triggerValue: triggerValue as TriggerType,
       actionName: setup?.action || 'Unbekannt',
       icon: setup?.icon || 'mdi-help',
-      hasStep: setup?.config && 'step' in setup.config,
-      step: setup?.config?.step,
-      hasKey: setup?.config && 'key' in setup.config,
-      key: setup?.config?.key,
-      isToggleApp: setup?.config && setup.config.type === 'ToggleAppAudio',
-      process_name: setup?.config?.process_name,
+      hasStep,
+      step: config?.step,
+      hasKey,
+      key: config?.key,
+      needsProcess,
+      process_name: config?.process_name,
       hasSettings
     };
   });
@@ -259,7 +268,10 @@ const assignAction = async (action: any) => {
   }
 
   const config = { ...action.config };
-  if ('step' in config) config.step = targetTrigger.includes('Left') ? -5 : 5;
+  // Standard-Voreinstellung: Links drehen -> Leiser, sonst Lauter
+  if ('step' in config) {
+    config.step = (targetTrigger === 'TurnLeft' || targetTrigger === 'PushTurnLeft') ? -5 : 5;
+  }
 
   store.updateElementAction(store.selectedElementId, targetTrigger, { action: action.title, icon: action.icon, config: config });
   try { await updateActionMapping(store.selectedElementId, targetTrigger, config); } catch (e) { console.error(e); }
@@ -298,13 +310,6 @@ const updateActionKey = async (trigger: TriggerType, newKey: string) => {
   }
 };
 
-const unbindSpecificAction = async (triggerToDelete: TriggerType) => {
-  if (store.selectedElementId) {
-    store.clearElementAction(store.selectedElementId, triggerToDelete);
-    try { await removeActionMapping(store.selectedElementId, triggerToDelete); } catch (e) { console.error(e); }
-  }
-};
-
 const updateActionProcess = async (trigger: TriggerType, name: string) => {
   if (!store.selectedElementId) return;
   const currentAction = store.activeProfile?.keys[store.selectedElementId]?.actions?.[trigger];
@@ -315,69 +320,14 @@ const updateActionProcess = async (trigger: TriggerType, name: string) => {
   }
 };
 
+const unbindSpecificAction = async (triggerToDelete: TriggerType) => {
+  if (store.selectedElementId) {
+    store.clearElementAction(store.selectedElementId, triggerToDelete);
+    try { await removeActionMapping(store.selectedElementId, triggerToDelete); } catch (e) { console.error(e); }
+  }
+};
+
 onMounted(() => {
   fetchProcesses();
 });
 </script>
-
-<style scoped>
-.gap-3 { gap: 12px; }
-
-.text-help { cursor: help; }
-
-.compact-trigger-select { width: 120px; }
-.compact-trigger-select :deep(.v-field__input) {
-  font-size: 0.8rem !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  min-height: 28px !important;
-  color: #a1a1aa !important;
-}
-.compact-trigger-select :deep(.v-field__append-inner) { padding-top: 0 !important; align-items: center; }
-
-.compact-key-select { max-width: 80px; }
-.compact-key-select :deep(.v-field__input) {
-  font-size: 0.875rem !important;
-  text-align: right;
-  color: #6366f1 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-.action-menu-item:hover {
-  background: rgba(99, 102, 241, 0.1) !important;
-  color: #6366f1 !important;
-}
-
-.hover-error:hover {
-  color: #ef4444 !important;
-  background: rgba(239, 68, 68, 0.1);
-  border-radius: 50%;
-}
-
-.edit-trigger {
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.03);
-  transition: all 0.2s;
-}
-.edit-trigger:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #6366f1 !important;
-}
-
-.inline-input-wrapper { width: 55px; margin-top: -6px; }
-.inline-input-wrapper :deep(input) {
-  text-align: right;
-  font-size: 0.875rem !important;
-  font-weight: bold;
-  color: white !important;
-  padding-bottom: 2px !important;
-}
-.inline-input-wrapper :deep(input[type="number"]::-webkit-outer-spin-button),
-.inline-input-wrapper :deep(input[type="number"]::-webkit-inner-spin-button) {
-  -webkit-appearance: none;
-  margin: 0;
-}
-</style>

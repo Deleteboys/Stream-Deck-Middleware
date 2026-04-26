@@ -3,3 +3,4 @@ pub(crate) mod spotify_volume;
 pub(crate) mod master_volume;
 pub(crate) mod toggle_app_audio;
 pub(crate) mod toggle_master_mute;
+pub(crate) mod app_volume_action;

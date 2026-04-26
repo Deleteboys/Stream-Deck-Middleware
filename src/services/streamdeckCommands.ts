@@ -18,7 +18,8 @@ export type ActionConfig =
     | { type: 'ToggleAudio'; device1: string; device2: string }
     | { type: 'MasterVolume'; step: number }
     | { type: 'ToggleAppAudio'; process_name: string }
-    | { type: 'ToggleMasterMute' };
+    | { type: 'ToggleMasterMute' }
+    | { type: 'AppVolume'; process_name: string; step: number;  };
 
 export type ProcessInfo = {
     pid: number;

@@ -309,6 +309,7 @@ pub enum ActionConfig {
     MasterVolume { step: i8 },
     ToggleAppAudio { process_name: String },
     ToggleMasterMute,
+    AppVolume { process_name: String, step: i8 },
     // ... hier kommen alle deine zukünftigen Module rein
 }
 
@@ -374,6 +375,9 @@ fn create_action(config: ActionConfig) -> Box<dyn action::actions::Action> {
         ActionConfig::ToggleMasterMute => {
             Box::new(modules::toggle_master_mute::ToggleMasterMuteAction {})
         }
+        ActionConfig::AppVolume { process_name, step } => {
+            Box::new(modules::app_volume_action::AppVolumeAction { process_name, step })
+        }
         // ActionConfig::SpotifyVolume { volume } => {
         //     Box::new(crate::modules::spotify_action::SetSpotifyVolumeAction {
         //         volume
@@ -386,7 +390,7 @@ fn create_action(config: ActionConfig) -> Box<dyn action::actions::Action> {
         // }
         _ => {
             println!("WARNUNG: Aktion noch nicht implementiert!");
-            Box::new(crate::modules::press_key_action::PressKeyAction {
+            Box::new(modules::press_key_action::PressKeyAction {
                 key: enigo::Key::F14,
             })
         }
