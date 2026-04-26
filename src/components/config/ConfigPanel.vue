@@ -66,17 +66,11 @@
               class="border border-zinc-800 rounded-lg overflow-hidden"
           >
             <div class="d-flex align-center justify-space-between px-3 py-2 bg-zinc-800 border-b border-zinc-700">
-
               <div class="d-flex align-center flex-grow-1 overflow-hidden mr-3">
                 <v-icon :icon="item.icon" color="primary" size="small" class="mr-2 flex-shrink-0"></v-icon>
                 <span class="text-body-2 font-weight-bold text-white text-truncate text-help">
                   {{ item.actionName }}
-
-                  <v-tooltip
-                      activator="parent"
-                      location="top"
-                      open-delay="250"
-                  >
+                  <v-tooltip activator="parent" location="top" open-delay="250">
                     {{ item.actionName }}
                   </v-tooltip>
                 </span>
@@ -105,7 +99,7 @@
               </div>
             </div>
 
-            <div class="px-3 py-3">
+            <div class="px-3 py-3" v-if="item.hasSettings">
 
               <div v-if="item.hasKey" class="d-flex align-center justify-space-between">
                 <div class="text-body-2 text-grey">Tastenkombination</div>
@@ -123,7 +117,6 @@
               <div v-if="item.hasStep">
                 <div class="d-flex justify-space-between align-center mb-1">
                   <div class="text-body-2 text-grey">Intervall</div>
-
                   <span
                       v-if="editingStepTrigger !== item.triggerValue"
                       class="text-body-2 text-white font-weight-bold edit-trigger"
@@ -132,7 +125,6 @@
                   >
                     {{ item.step > 0 ? '+' : '' }}{{ item.step }}%
                   </span>
-
                   <div v-else class="inline-input-wrapper">
                     <v-text-field
                         :model-value="item.step"
@@ -148,7 +140,6 @@
                     ></v-text-field>
                   </div>
                 </div>
-
                 <v-slider
                     :model-value="item.step"
                     :min="-50"
@@ -161,7 +152,7 @@
                 ></v-slider>
               </div>
 
-              <div v-if="item.isToggleApp" class="mt-3">
+              <div v-if="item.isToggleApp" class="mt-1">
                 <div class="d-flex justify-space-between align-center mb-1">
                   <div class="text-body-2 text-grey">Prozess auswählen</div>
                   <v-btn
@@ -173,7 +164,6 @@
                       @click="fetchProcesses"
                   ></v-btn>
                 </div>
-
                 <v-autocomplete
                     :model-value="item.process_name"
                     :items="activeProcesses"
@@ -181,11 +171,19 @@
                     density="compact"
                     hide-details
                     placeholder="Suche nach .exe..."
-                    class="mb-3 text-white"
+                    class="mb-2 text-white"
                     @update:model-value="(val) => updateActionProcess(item.triggerValue, val)"
                 ></v-autocomplete>
               </div>
             </div>
+
+            <div class="px-3 py-2 bg-zinc-800 bg-opacity-30 d-flex align-center justify-center" v-else>
+              <v-icon icon="mdi-information-outline" size="x-small" color="grey" class="mr-2"></v-icon>
+              <div class="text-caption text-grey font-italic" style="opacity: 0.6;">
+                Keine weiteren Einstellungen erforderlich
+              </div>
+            </div>
+
           </v-card>
         </div>
       </section>
@@ -269,19 +267,28 @@ const boundActionsList = computed(() => {
   const actionsMap = store.activeProfile?.keys[store.selectedElementId]?.actions;
   if (!actionsMap) return [];
 
-  return Object.entries(actionsMap).map(([triggerValue, setup]) => ({
-    triggerValue: triggerValue as TriggerType,
-    actionName: setup?.action || 'Unbekannt',
-    icon: setup?.icon || 'mdi-help',
-    hasStep: setup?.config && 'step' in setup.config,
-    step: setup?.config?.step,
-    hasKey: setup?.config && 'key' in setup.config,
-    key: setup?.config?.key,
-    isToggleApp: setup?.config && setup.config.type === 'ToggleAppAudio',
-    process_name: setup?.config?.process_name
-  }));
-});
+  return Object.entries(actionsMap).map(([triggerValue, setup]) => {
+    // Prüfen, ob diese Aktion irgendwelche UI-Einstellungen braucht
+    const hasSettings = setup?.config && (
+        'step' in setup.config ||
+        'key' in setup.config ||
+        setup.config.type === 'ToggleAppAudio'
+    );
 
+    return {
+      triggerValue: triggerValue as TriggerType,
+      actionName: setup?.action || 'Unbekannt',
+      icon: setup?.icon || 'mdi-help',
+      hasStep: setup?.config && 'step' in setup.config,
+      step: setup?.config?.step,
+      hasKey: setup?.config && 'key' in setup.config,
+      key: setup?.config?.key,
+      isToggleApp: setup?.config && setup.config.type === 'ToggleAppAudio',
+      process_name: setup?.config?.process_name,
+      hasSettings // <-- NEU
+    };
+  });
+});
 watch(() => store.selectedElementId, (newId) => {
   if (newId) {
     buttonLabel.value = store.activeProfile?.keys[newId]?.label || '';
