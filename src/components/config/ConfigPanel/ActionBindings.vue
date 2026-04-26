@@ -342,3 +342,65 @@ onMounted(() => {
   fetchProcesses();
 });
 </script>
+
+<style scoped>
+.gap-3 { gap: 12px; }
+
+.text-help { cursor: help; }
+
+.compact-trigger-select { width: 120px; }
+.compact-trigger-select :deep(.v-field__input) {
+  font-size: 0.8rem !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  min-height: 28px !important;
+  color: #a1a1aa !important;
+}
+.compact-trigger-select :deep(.v-field__append-inner) { padding-top: 0 !important; align-items: center; }
+
+.compact-key-select { max-width: 80px; }
+.compact-key-select :deep(.v-field__input) {
+  font-size: 0.875rem !important;
+  text-align: right;
+  color: #6366f1 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.action-menu-item:hover {
+  background: rgba(99, 102, 241, 0.1) !important;
+  color: #6366f1 !important;
+}
+
+.hover-error:hover {
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 50%;
+}
+
+.edit-trigger {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  transition: all 0.2s;
+}
+.edit-trigger:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #6366f1 !important;
+}
+
+.inline-input-wrapper { width: 55px; margin-top: -6px; }
+.inline-input-wrapper :deep(input) {
+  text-align: right;
+  font-size: 0.875rem !important;
+  font-weight: bold;
+  color: white !important;
+  padding-bottom: 2px !important;
+}
+.inline-input-wrapper :deep(input[type="number"]::-webkit-outer-spin-button),
+.inline-input-wrapper :deep(input[type="number"]::-webkit-inner-spin-button) {
+  -webkit-appearance: none;
+  margin: 0;
+}
+</style>
