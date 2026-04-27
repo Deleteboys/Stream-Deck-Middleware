@@ -21,6 +21,14 @@ const rgbToHex = (r: number, g: number, b: number) =>
         .map((channel) => Math.max(0, Math.min(255, channel)).toString(16).padStart(2, '0'))
         .join('')}`
 
+// --- NEUE TYPEN FÜR OLED SLOTS ---
+export interface OledSlot {
+    icon: string;
+    process: string;
+    muted?: boolean;
+    value?: number;
+}
+
 export type ActionSetup = {
     action?: string
     icon?: string
@@ -32,6 +40,8 @@ type ProfileKeyConfig = {
     icon?: string
     value?: number
     actions?: Partial<Record<TriggerType, ActionSetup>>
+    // HIER: Slots als optionales Feld hinzufügen, damit TS nicht mehr meckert
+    slots?: OledSlot[]
 }
 
 type Profile = {
@@ -83,8 +93,11 @@ const isActionConfig = (value: unknown): value is ActionConfig => {
         config.type === 'ToggleAudio' ||
         config.type === 'MasterVolume' ||
         config.type === 'ToggleAppAudio' ||
+        config.type === 'MasterVolume' ||
         config.type === 'ToggleMasterMute' ||
-        config.type === 'AppVolume'
+        config.type === 'AppVolume' ||
+        config.type === 'ForegroundVolume' ||
+        config.type === 'ToggleForegroundAudio'
     )
 }
 
@@ -141,10 +154,8 @@ export const useStreamDeckStore = defineStore('streamdeck', {
             for (let i = 0; i < slots.length; i++) {
                 try {
                     await setIconSlot(i, slots[i].icon);
-
-                    // NEU: Dem Pico 50ms Zeit geben, um den Befehl zu verarbeiten
+                    // Kurze Pause, um den seriellen Puffer nicht zu überlasten
                     await new Promise(resolve => setTimeout(resolve, 50));
-
                 } catch (e) {
                     console.error(`Fehler beim Sync von Slot ${i}:`, e);
                 }
@@ -177,7 +188,6 @@ export const useStreamDeckStore = defineStore('streamdeck', {
             this.isDeviceConnected = isConnected
             if (isConnected) {
                 console.log("Gerät verbunden - starte Voll-Sync...");
-                // await this.syncOledIconsToBackend();
             }
         },
 
@@ -215,15 +225,17 @@ export const useStreamDeckStore = defineStore('streamdeck', {
             this.persistState()
         },
 
-        updateOledSlots(slots: any[]) {
+        // HIER: updateOledSlots mit korrektem Typ-Handling
+        updateOledSlots(slots: OledSlot[]) {
             if (!this.activeProfile) return;
 
             if (!this.activeProfile.keys['oled-display']) {
                 this.activeProfile.keys['oled-display'] = {};
             }
 
+            // Hier wird .slots nun von TypeScript erkannt
             this.activeProfile.keys['oled-display'].slots = JSON.parse(JSON.stringify(slots));
-            this.persistState(); // Speichert es im localStorage (für Restart)
+            this.persistState();
         },
 
         clearElementAction(id: string | null, trigger: TriggerType) {

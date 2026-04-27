@@ -3,6 +3,7 @@ pub mod action;
 mod modules;
 mod protocol;
 mod serial;
+mod audio;
 // Das bindet den Ordner "action" über die mod.rs ein
 
 use crate::action::actions::{ButtonEvent, EncoderEvent, HardwareTrigger};
@@ -310,6 +311,8 @@ pub enum ActionConfig {
     ToggleAppAudio { process_name: String },
     ToggleMasterMute,
     AppVolume { process_name: String, step: i8 },
+    ForegroundVolume { step: i8 },
+    ToggleForegroundAudio,
     // ... hier kommen alle deine zukünftigen Module rein
 }
 
@@ -377,6 +380,12 @@ fn create_action(config: ActionConfig) -> Box<dyn action::actions::Action> {
         }
         ActionConfig::AppVolume { process_name, step } => {
             Box::new(modules::app_volume_action::AppVolumeAction { process_name, step })
+        }
+        ActionConfig::ForegroundVolume { step } => {
+            Box::new(modules::foreground_volume::ForegroundVolumeAction { step })
+        }
+        ActionConfig::ToggleForegroundAudio => {
+            Box::new(modules::toggle_foreground_audio::ToggleForegroundAudioAction {})
         }
         // ActionConfig::SpotifyVolume { volume } => {
         //     Box::new(crate::modules::spotify_action::SetSpotifyVolumeAction {

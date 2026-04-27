@@ -19,7 +19,9 @@ export type ActionConfig =
     | { type: 'MasterVolume'; step: number }
     | { type: 'ToggleAppAudio'; process_name: string }
     | { type: 'ToggleMasterMute' }
-    | { type: 'AppVolume'; process_name: string; step: number;  };
+    | { type: 'AppVolume'; process_name: string; step: number;  }
+    | { type: 'ForegroundVolume'; step: number; }
+    | { type: 'ToggleForegroundAudio' };
 
 export type ProcessInfo = {
     pid: number;

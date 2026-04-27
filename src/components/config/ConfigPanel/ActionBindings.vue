@@ -195,7 +195,9 @@ const actionsLibrary = [
   { title: 'Audio Toggle', icon: 'mdi-swap-horizontal', config: { type: 'ToggleAudio', device1: 'HyperX', device2: 'Speakers' } },
   { title: 'App Audio (Volume)', icon: 'mdi-volume-plus', config: { type: 'AppVolume', process_name: '', step: 5 } }, // NEU
   { title: 'App Audio (Toggle)', icon: 'mdi-volume-off', config: { type: 'ToggleAppAudio', process_name: '' } },
-  { title: 'Global Mute (Toggle)', icon: 'mdi-volume-mute', config: { type: 'ToggleMasterMute' } }
+  { title: 'Global Mute (Toggle)', icon: 'mdi-volume-mute', config: { type: 'ToggleMasterMute' } },
+  { title: 'Current Window (Volume)', icon: 'mdi-monitor-speaker', config: { type: 'ForegroundVolume', step: 5 } },
+  { title: 'Aktuelles Fenster (Toggle)', icon: 'mdi-speaker-off', config: { type: 'ToggleForegroundAudio' } }
 ];
 
 // --- COMPUTED ---
