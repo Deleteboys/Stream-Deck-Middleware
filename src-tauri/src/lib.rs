@@ -361,7 +361,7 @@ fn parse_key(key_str: &str) -> enigo::Key {
 }
 
 // Factory, die das Config-Enum in ausführbaren Code (Action Trait) verwandelt
-fn create_action(config: ActionConfig) -> Box<dyn action::actions::Action> {
+fn create_action(config: ActionConfig, tx: mpsc::Sender<HostToPico>) -> Box<dyn action::actions::Action> {
     match config {
         ActionConfig::PressKey { key } => Box::new(modules::press_key_action::PressKeyAction {
             key: parse_key(&key),
@@ -379,10 +379,10 @@ fn create_action(config: ActionConfig) -> Box<dyn action::actions::Action> {
             Box::new(modules::toggle_master_mute::ToggleMasterMuteAction {})
         }
         ActionConfig::AppVolume { process_name, step } => {
-            Box::new(modules::app_volume_action::AppVolumeAction { process_name, step })
+            Box::new(modules::app_volume_action::AppVolumeAction { process_name, step, tx })
         }
         ActionConfig::ForegroundVolume { step } => {
-            Box::new(modules::foreground_volume::ForegroundVolumeAction { step })
+            Box::new(modules::foreground_volume::ForegroundVolumeAction { step, tx })
         }
         ActionConfig::ToggleForegroundAudio => {
             Box::new(modules::toggle_foreground_audio::ToggleForegroundAudioAction {})
@@ -408,9 +408,13 @@ fn create_action(config: ActionConfig) -> Box<dyn action::actions::Action> {
 
 #[tauri::command]
 fn update_mapping(state: State<AppState>, payload: MappingPayload) -> Result<(), String> {
-    // Nutze die vollständige Hilfsfunktion anstatt die Logik neu zu schreiben
+    // 1. Hole den Sender aus dem State
+    let tx = state.serial_tx.lock().unwrap().clone().ok_or("Keine serielle Verbindung verfügbar")?;
+
     let trigger = trigger_from_payload(&payload.element_id, &payload.trigger_type)?;
-    let action = create_action(payload.action_config);
+
+    // 2. Übergebe ihn an create_action
+    let action = create_action(payload.action_config, tx);
 
     if let Ok(mut manager) = state.action_manager.lock() {
         manager.register(trigger, action);
@@ -437,13 +441,18 @@ fn remove_mapping(state: State<AppState>, payload: UnmapPayload) -> Result<(), S
 
 #[tauri::command]
 fn sync_mappings(state: State<AppState>, mappings: Vec<MappingPayload>) -> Result<(), String> {
+    // 1. Hole den Sender
+    let tx = state.serial_tx.lock().unwrap().clone().ok_or("Keine serielle Verbindung verfügbar")?;
+
     if let Ok(mut manager) = state.action_manager.lock() {
         manager.clear();
 
         for payload in mappings {
-            let trigger = trigger_from_payload(&payload.element_id, &payload.trigger_type)?;
-            let action = create_action(payload.action_config);
-            manager.register(trigger, action);
+            if let Ok(trigger) = trigger_from_payload(&payload.element_id, &payload.trigger_type) {
+                // 2. Sender mitgeben (wir müssen hier tx.clone() machen, falls wir in der Schleife sind)
+                let action = create_action(payload.action_config.clone(), tx.clone());
+                manager.register(trigger, action);
+            }
         }
     }
 

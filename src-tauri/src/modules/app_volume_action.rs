@@ -1,17 +1,21 @@
+use std::sync::mpsc;
 use sysinfo::{ProcessesToUpdate, System};
 use crate::action::actions::Action;
 use crate::audio::adjust_volume_for_pids;
+use crate::protocol::{HostToPico, VibrationPattern};
 
 #[derive(Debug, Clone)]
 pub struct AppVolumeAction {
     pub process_name: String,
     pub step: i8,
+    pub tx: mpsc::Sender<HostToPico>,
 }
 
 impl Action for AppVolumeAction {
     fn execute(&self) {
         let name = self.process_name.clone();
         let step = self.step;
+        let tx = self.tx.clone();
 
         tauri::async_runtime::spawn(async move {
             // FIX: Erstelle nur ein leeres System-Objekt (ohne Hardware-Sensoren, Disks, etc.)
@@ -25,8 +29,12 @@ impl Action for AppVolumeAction {
                 .collect();
 
             unsafe {
-                if let Err(e) = adjust_volume_for_pids(&target_pids, step) {
-                    println!("Fehler bei {}: {}", name, e);
+                match adjust_volume_for_pids(&target_pids, step) {
+                    Ok(true) => {
+                        let _ = tx.send(HostToPico::Vibrate { pattern: VibrationPattern::Medium });
+                    }
+                    Err(e) => println!("Fehler bei {}: {}", name, e),
+                    _ => {} // Nichts tun, wenn das Limit nicht erreicht wurde
                 }
             }
         });

@@ -1,15 +1,19 @@
+use std::sync::mpsc;
 use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
 use crate::action::actions::Action;
 use crate::audio::adjust_volume_for_pids;
+use crate::protocol::{HostToPico, VibrationPattern};
 
 #[derive(Debug, Clone)]
 pub struct ForegroundVolumeAction {
     pub step: i8,
+    pub tx: mpsc::Sender<HostToPico>,
 }
 
 impl Action for ForegroundVolumeAction {
     fn execute(&self) {
         let step = self.step;
+        let tx = self.tx.clone();
 
         tauri::async_runtime::spawn(async move {
             unsafe {
@@ -22,10 +26,12 @@ impl Action for ForegroundVolumeAction {
                 GetWindowThreadProcessId(hwnd, Some(&mut pid));
 
                 if pid != 0 {
-                    if let Err(e) = adjust_volume_for_pids(&[pid], step) {
-                        println!("Fehler beim Ändern des Vordergrund-Programms: {}", e);
-                    } else {
-                        println!("Vordergrund-Lautstärke angepasst (PID: {})", pid);
+                    match adjust_volume_for_pids(&[pid], step) {
+                        Ok(true) => {
+                            let _ = tx.send(HostToPico::Vibrate { pattern: VibrationPattern::Medium });
+                        }
+                        Err(e) => println!("Vordergrund-Lautstärke angepasst (PID: {})", pid),
+                        _ => {} // Nichts tun, wenn das Limit nicht erreicht wurde
                     }
                 }
             }

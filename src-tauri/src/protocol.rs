@@ -9,6 +9,14 @@ pub enum IconType {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub enum VibrationPattern {
+    Short,
+    Medium,
+    Long,
+    Custom(u64),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub enum LedEffect {
     Solid {
         r: u8,
@@ -149,6 +157,9 @@ pub enum HostToPico {
     SetVolume {
         slot: u8,
         volume: u8,
+    },
+    Vibrate {
+        pattern: VibrationPattern,
     }
 }
 
