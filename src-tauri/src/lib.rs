@@ -305,6 +305,7 @@ pub fn run() {
 #[serde(tag = "type")] // <-- Das ist die Magie!
 pub enum ActionConfig {
     PressKey { key: String },
+    MediaControl { key: String },
     SpotifyVolume { step: i8 },
     ToggleAudio { device1: String, device2: String },
     MasterVolume { step: i8 },
@@ -354,8 +355,12 @@ fn parse_key(key_str: &str) -> enigo::Key {
         }
     }
 
-    match key_upper.as_str() {
+    match key_upper.to_uppercase().as_str() {
         "A" => enigo::Key::Unicode('a'),
+        "MEDIAPLAYPAUSE" => enigo::Key::MediaPlayPause,
+        "MEDIANEXT" => enigo::Key::MediaNextTrack,
+        "MEDIAPREV" => enigo::Key::MediaPrevTrack,
+        "MEDIAMUTE" => enigo::Key::VolumeMute,
         _ => enigo::Key::Return,
     }
 }
@@ -364,6 +369,9 @@ fn parse_key(key_str: &str) -> enigo::Key {
 fn create_action(config: ActionConfig, tx: mpsc::Sender<HostToPico>) -> Box<dyn action::actions::Action> {
     match config {
         ActionConfig::PressKey { key } => Box::new(modules::press_key_action::PressKeyAction {
+            key: parse_key(&key),
+        }),
+        ActionConfig::MediaControl { key } => Box::new(modules::press_key_action::PressKeyAction {
             key: parse_key(&key),
         }),
         ActionConfig::SpotifyVolume { step } => {

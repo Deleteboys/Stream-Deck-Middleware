@@ -93,6 +93,22 @@
             ></v-select>
           </div>
 
+          <div v-if="item.hasMediaKey" class="d-flex align-center justify-space-between">
+            <div class="text-body-2 text-grey">Media Funktion</div>
+            <v-select
+                :model-value="item.key"
+                :items="mediaKeys"
+                item-title="title"
+                item-value="value"
+                variant="underlined"
+                density="compact"
+                hide-details
+                class="compact-key-select"
+                style="max-width: 140px;"
+                @update:model-value="(val) => updateActionKey(item.triggerValue, val)"
+            ></v-select>
+          </div>
+
           <div v-if="item.hasStep">
             <div class="d-flex justify-space-between align-center mb-1">
               <div class="text-body-2 text-grey">Intervall</div>
@@ -185,15 +201,23 @@ const editingStepTrigger = ref<TriggerType | null>(null);
 const activeProcesses = ref<string[]>([]);
 const fKeys = Array.from({ length: 12 }, (_, i) => `F${i + 13}`);
 
+const mediaKeys = [
+  { title: 'Play / Pause', value: 'MEDIAPLAYPAUSE' },
+  { title: 'Nächster Track', value: 'MEDIANEXT' },
+  { title: 'Vorheriger Track', value: 'MEDIAPREV' },
+  { title: 'Mute', value: 'MEDIAMUTE' }
+];
+
 const ENCODER_ORDER: TriggerType[] = ['TurnRight', 'TurnLeft', 'PushTurnRight', 'PushTurnLeft', 'PushPress'];
 const BUTTON_ORDER: TriggerType[] = ['ShortPress', 'DoublePress', 'LongPress'];
 
 const actionsLibrary = [
   { title: 'Taste drücken', icon: 'mdi-keyboard', config: { type: 'PressKey', key: 'F13' } },
+  { title: 'Media Control', icon: 'mdi-play-pause', config: { type: 'MediaControl', key: 'MEDIAPLAYPAUSE' } },
   { title: 'Spotify Volume', icon: 'mdi-spotify', config: { type: 'SpotifyVolume', step: 5 } },
   { title: 'Master Volume', icon: 'mdi-volume-high', config: { type: 'MasterVolume', step: 5 } },
   { title: 'Audio Toggle', icon: 'mdi-swap-horizontal', config: { type: 'ToggleAudio', device1: 'HyperX', device2: 'Speakers' } },
-  { title: 'App Audio (Volume)', icon: 'mdi-volume-plus', config: { type: 'AppVolume', process_name: '', step: 5 } }, // NEU
+  { title: 'App Audio (Volume)', icon: 'mdi-volume-plus', config: { type: 'AppVolume', process_name: '', step: 5 } },
   { title: 'App Audio (Toggle)', icon: 'mdi-volume-off', config: { type: 'ToggleAppAudio', process_name: '' } },
   { title: 'Global Mute (Toggle)', icon: 'mdi-volume-mute', config: { type: 'ToggleMasterMute' } },
   { title: 'Current Window (Volume)', icon: 'mdi-monitor-speaker', config: { type: 'ForegroundVolume', step: 5 } },
@@ -229,9 +253,10 @@ const boundActionsList = computed(() => {
     const type = config?.type;
 
     const hasStep = config && 'step' in config;
-    const hasKey = config && 'key' in config;
+    const hasKey = config && 'key' in config && type === 'PressKey';
+    const hasMediaKey = config && 'key' in config && type === 'MediaControl';
     const needsProcess = type === 'ToggleAppAudio' || type === 'AppVolume';
-    const hasSettings = hasStep || hasKey || needsProcess;
+    const hasSettings = hasStep || hasKey || hasMediaKey || needsProcess;
 
     return {
       triggerValue: triggerValue as TriggerType,
@@ -240,6 +265,7 @@ const boundActionsList = computed(() => {
       hasStep,
       step: config?.step,
       hasKey,
+      hasMediaKey,
       key: config?.key,
       needsProcess,
       process_name: config?.process_name,

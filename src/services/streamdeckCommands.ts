@@ -14,6 +14,7 @@ export type TriggerType =
 
 export type ActionConfig =
     | { type: 'PressKey'; key: string }
+    | { type: 'MediaControl'; key: string }
     | { type: 'SpotifyVolume'; step: number }
     | { type: 'ToggleAudio'; device1: string; device2: string }
     | { type: 'MasterVolume'; step: number }
