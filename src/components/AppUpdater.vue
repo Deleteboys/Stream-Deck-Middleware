@@ -164,6 +164,11 @@ const startUpdate = async () => {
     console.error("Fehler bei der Installation:", error);
     statusMessage.value = 'Fehler beim Update!';
     downloadDetails.value = String(error);
+
+    statusMessage.value = 'Update-Fehler';
+    downloadDetails.value = String(error);
+    updatePhase.value = 2;
+    dialogVisible.value = true;
   }
 };
 </script>
