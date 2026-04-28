@@ -261,15 +261,6 @@ onUnmounted(() => {
 });
 
 watchEffect(() => {
-  // Tiefe Properties ansprechen, damit Vue das Re-Rendering triggert
-  const slots = store.activeProfile?.keys['oled-display']?.slots;
-  if (slots) {
-    slots.forEach(slot => {
-      const _v = slot.value;
-      const _m = slot.muted;
-      const _i = slot.icon;
-    });
-  }
   renderDisplay();
 });
 </script>
