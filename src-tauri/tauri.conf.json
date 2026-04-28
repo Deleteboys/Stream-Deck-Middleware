@@ -20,6 +20,8 @@
         "devtools": true
       }
     ],
+
+    
     "security": {
       "csp": null
     }
