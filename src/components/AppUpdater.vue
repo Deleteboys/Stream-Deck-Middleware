@@ -93,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, shallowRef, onMounted } from 'vue';
 import { check, type Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getVersion } from '@tauri-apps/api/app';
@@ -102,7 +102,12 @@ const dialogVisible = ref(false);
 const updatePhase = ref(1);
 
 const currentVersion = ref('0.0.0');
-const updateInfo = ref<Update | null>(null);
+
+/**
+ * WICHTIG: shallowRef verhindert, dass Vue das Update-Objekt in einen Proxy verwandelt.
+ * Ohne shallowRef kommt es beim Aufruf interner Methoden zu "Private member" Fehlern.
+ */
+const updateInfo = shallowRef<Update | null>(null);
 
 const statusMessage = ref('Lade Update herunter...');
 const downloadDetails = ref('');
@@ -110,10 +115,8 @@ const downloadProgress = ref(0);
 
 onMounted(async () => {
   try {
-    // Hole die aktuell installierte Version
     currentVersion.value = await getVersion();
 
-    // Prüfe auf GitHub nach neuen Releases
     const update = await check();
     if (update) {
       updateInfo.value = update;
@@ -132,6 +135,7 @@ const startUpdate = async () => {
   let contentLength = 0;
 
   try {
+    // Da wir shallowRef nutzen, ist .value das originale Tauri-Objekt
     await updateInfo.value.downloadAndInstall((event) => {
       switch (event.event) {
         case 'Started':
@@ -142,7 +146,6 @@ const startUpdate = async () => {
           downloaded += event.data.chunkLength;
           if (contentLength > 0) {
             downloadProgress.value = (downloaded / contentLength) * 100;
-            // Zeige MB an (optional, sieht aber professionell aus)
             const dlMb = (downloaded / 1024 / 1024).toFixed(1);
             const totalMb = (contentLength / 1024 / 1024).toFixed(1);
             downloadDetails.value = `${dlMb} MB / ${totalMb} MB`;
@@ -156,7 +159,6 @@ const startUpdate = async () => {
       }
     });
 
-    // Nach erfolgreicher Installation App neu starten
     await relaunch();
   } catch (error) {
     console.error("Fehler bei der Installation:", error);
@@ -167,15 +169,10 @@ const startUpdate = async () => {
 </script>
 
 <style scoped>
-/* Typografie */
 .uppercase { text-transform: uppercase; }
 .tracking-widest { letter-spacing: 0.1em !important; }
 .font-monospace { font-family: 'Courier New', Courier, monospace; }
-
-/* Flex Gap Utility (falls nicht global in Vuetify konfiguriert) */
 .gap-3 { gap: 12px; }
-
-/* Colors & Borders */
 .bg-zinc-800 { background-color: #27272a !important; }
 .bg-zinc-900 { background-color: #121214 !important; }
 .border-b { border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important; }
@@ -188,13 +185,11 @@ const startUpdate = async () => {
   border-color: rgba(255, 255, 255, 0.15) !important;
 }
 
-/* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
 
-/* Animation */
 .spin-animation {
   animation: spin 1.5s linear infinite;
 }
