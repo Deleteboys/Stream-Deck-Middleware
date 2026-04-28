@@ -181,7 +181,8 @@ pub fn run() {
     let is_device_connected_for_thread = Arc::clone(&is_device_connected);
     let monitor_slots = Arc::new(Mutex::new([None, None, None, None]));
 
-    monitor::start_monitoring(Arc::clone(&monitor_slots), tx.clone());
+    let monitor_slots_for_setup = Arc::clone(&monitor_slots);
+    let tx_for_monitor = tx.clone();
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -211,6 +212,9 @@ pub fn run() {
             let quit_i = MenuItem::with_id(app, "quit", "Beenden", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "Einstellungen", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+
+            let app_handle = app.handle().clone();
+            monitor::start_monitoring(app_handle.clone(), monitor_slots_for_setup, tx_for_monitor);
 
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())

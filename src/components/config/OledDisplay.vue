@@ -16,17 +16,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watchEffect } from 'vue';
+import { ref, onMounted, onUnmounted, watchEffect } from 'vue';
 import { useStreamDeckStore } from '@/stores/streamdeck';
+import { listen } from '@tauri-apps/api/event';
 
 const store = useStreamDeckStore();
 const oledCanvas = ref<HTMLCanvasElement | null>(null);
+let unlistenAudioUpdate: (() => void) | null = null;
 
 // Fallback-Daten
 const VOLUMES = [50, 65, 80, 35];
 const defaultIcons = ['MASTER', 'SPOTIFY', 'DISCORD', 'BROWSER'];
 
 const ICONS: Record<string, string[]> = {
+  // ... (Behalte deine ICONS und den FONT_5X7 einfach exakt so bei, wie sie sind) ...
   MASTER: [
     "              ", "       11     ", "      111     ", "     1111   1 ",
     "   111111   11", "   111111  111", "   111111  111", "   111111  111",
@@ -54,8 +57,8 @@ const ICONS: Record<string, string[]> = {
   NONE: [""]
 };
 
-// Exakter Port des 5x7 Fonts
 const FONT_5X7: Record<string, number[]> = {
+  // ... (dein Font Code) ...
   ' ': [0x00, 0x00, 0x00, 0x00, 0x00],
   '%': [0x23, 0x13, 0x08, 0x64, 0x62],
   '-': [0x08, 0x08, 0x08, 0x08, 0x08],
@@ -172,24 +175,21 @@ const renderDisplay = () => {
   const drawIcon = (x: number, y: number, iconData: string[], on: boolean) => {
     for (let row = 0; row < iconData.length; row++) {
       const line = iconData[row];
+      // HIER GEFIXT: Fehlende Zeichen werden dynamisch ausgeglichen (Icon zentriert sich selbst)
+      const xOffset = Math.floor((14 - line.length) / 2);
       for (let col = 0; col < line.length; col++) {
         if (line[col] === '1') {
-          putPixel(x + col, y + row, on);
+          putPixel(x + xOffset + col, y + row, on);
         }
       }
     }
   };
 
-  // 1. Profilname
   const profileName = store.activeProfile?.name || 'MAIN';
   drawTextCenteredInRange(0, profileName.toUpperCase(), 0, DISPLAY_WIDTH - 1, true);
-
-  // 2. Horizontale Trennlinie
   drawDashedHLine(10, 0, DISPLAY_WIDTH - 1, 2, true);
 
   const segmentWidth = Math.floor(DISPLAY_WIDTH / 4);
-
-  // Hier holen wir uns die Config für alle Slots aus 'oled-display'
   const displayConfig = store.activeProfile?.keys['oled-display']?.slots || [];
 
   for (let i = 0; i < 4; i++) {
@@ -200,13 +200,11 @@ const renderDisplay = () => {
     if (i > 0) drawDashedVLine(xStart, 15, DISPLAY_HEIGHT - 1, 1, 2, true);
 
     const slotData = displayConfig[i] || {};
-
-    // 4. Icon zeichnen
     const iconKey = slotData.icon || defaultIcons[i];
     const iconData = ICONS[iconKey] || ICONS['MASTER'];
+
     drawIcon(iconX, iconY, iconData, true);
 
-    // 5. Mute-X (falls vom Backend oder Store gemutet)
     const isMuted = slotData.muted ?? false;
     if (isMuted) {
       for (let d = 0; d < 14; d++) {
@@ -217,7 +215,6 @@ const renderDisplay = () => {
       }
     }
 
-    // 6. Lautstärketext (Page 6)
     const volume = slotData.value ?? VOLUMES[i];
     let volStr = "---";
     if (volume !== 255) {
@@ -231,8 +228,50 @@ const renderDisplay = () => {
   ctx.putImageData(imageData, 0, 0);
 };
 
-onMounted(() => renderDisplay());
-watchEffect(() => renderDisplay());
+onMounted(async () => {
+  renderDisplay();
+
+  // HIER GEFIXT: Frontend lauscht jetzt auf Events aus Rust
+  unlistenAudioUpdate = await listen('audio-update', (event: any) => {
+    const { slot, volume, muted } = event.payload;
+
+    if (store.activeProfile) {
+      if (!store.activeProfile.keys['oled-display']) {
+        store.activeProfile.keys['oled-display'] = { slots: [] };
+      }
+      const slots = store.activeProfile.keys['oled-display'].slots || [];
+
+      // Auffüllen, falls der Array noch zu klein ist
+      while (slots.length <= slot) {
+        slots.push({ icon: 'NONE', process: '' });
+      }
+
+      // Werte setzen
+      slots[slot].value = volume;
+      slots[slot].muted = muted;
+
+      // Neues Array zuweisen, damit Vue die Änderung garantiert registriert
+      store.activeProfile.keys['oled-display'].slots = [...slots];
+    }
+  });
+});
+
+onUnmounted(() => {
+  if (unlistenAudioUpdate) unlistenAudioUpdate();
+});
+
+watchEffect(() => {
+  // Tiefe Properties ansprechen, damit Vue das Re-Rendering triggert
+  const slots = store.activeProfile?.keys['oled-display']?.slots;
+  if (slots) {
+    slots.forEach(slot => {
+      const _v = slot.value;
+      const _m = slot.muted;
+      const _i = slot.icon;
+    });
+  }
+  renderDisplay();
+});
 </script>
 
 <style scoped>

@@ -1,18 +1,22 @@
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 use std::time::Duration;
+use tauri::Emitter; // WICHTIG: Erlaubt das Senden von Events ans Frontend
 use crate::protocol::HostToPico;
 use crate::audio;
 
-pub struct MonitorState {
-    pub slots: Arc<Mutex<[Option<String>; 4]>>,
+#[derive(serde::Serialize, Clone)]
+pub struct AudioUpdatePayload {
+    pub slot: u8,
+    pub volume: u8,
+    pub muted: bool,
 }
 
-pub fn start_monitoring(state: Arc<Mutex<[Option<String>; 4]>>, tx: mpsc::Sender<HostToPico>) {
+pub fn start_monitoring(app_handle: tauri::AppHandle, state: Arc<Mutex<[Option<String>; 4]>>, tx: mpsc::Sender<HostToPico>) {
     thread::spawn(move || {
         println!("Audio thread is running in the background.");
         let mut last_volumes = [255u8; 4];
-        let mut last_mutes = [false; 4]; // Speicher für Mute-Status
+        let mut last_mutes = [false; 4];
 
         loop {
             let current_slots = {
@@ -33,17 +37,27 @@ pub fn start_monitoring(state: Arc<Mutex<[Option<String>; 4]>>, tx: mpsc::Sender
                 if let Ok(Some((vol_float, is_muted))) = status_result {
                     let vol_u8 = (vol_float * 100.0) as u8;
                     let slot_idx = i as u8;
+                    let mut changed = false;
 
-                    // 1. Check Lautstärke-Änderung
                     if vol_u8 != last_volumes[i] {
                         let _ = tx.send(HostToPico::SetVolume { slot: slot_idx, volume: vol_u8 });
                         last_volumes[i] = vol_u8;
+                        changed = true;
                     }
 
-                    // 2. Check Mute-Änderung
                     if is_muted != last_mutes[i] {
                         let _ = tx.send(HostToPico::SetMuteState { index: slot_idx, mute: is_muted });
                         last_mutes[i] = is_muted;
+                        changed = true;
+                    }
+
+                    // HIER NEU: Sende die Änderung auch an das Frontend
+                    if changed {
+                        let _ = app_handle.emit("audio-update", AudioUpdatePayload {
+                            slot: slot_idx,
+                            volume: last_volumes[i],
+                            muted: last_mutes[i],
+                        });
                     }
                 }
             }

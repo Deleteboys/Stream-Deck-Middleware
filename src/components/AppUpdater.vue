@@ -125,7 +125,7 @@ let unlistenUpdateTrigger: (() => void) | null = null;
 const checkForUpdates = async (isManualCheck = false) => {
   try {
     const update = await check();
-
+    console.log("update: " + JSON.stringify(update));
     if (update) {
       updateInfo.value = update;
       updatePhase.value = 1;
