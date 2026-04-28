@@ -24,6 +24,11 @@ export type ActionConfig =
     | { type: 'ForegroundVolume'; step: number; }
     | { type: 'ToggleForegroundAudio' };
 
+export type FirmwareUpdateInfo = {
+    version: string;
+    download_url: string;
+};
+
 export type ProcessInfo = {
     pid: number;
     name: string;
@@ -131,6 +136,7 @@ type HostToPicoCommand =
     | "Ping"
     | "StartBootloader"
     | "GetConfig"
+    | "GetVersion"
     | {
     FillAll: {
         r: number;
@@ -276,4 +282,21 @@ export async function setIconSlot(slot: number, icon: string): Promise<void> {
         console.error(`Fehler beim Senden von Icon ${icon} für Slot ${slot} an Rust:`, error);
         throw error;
     }
+}
+
+export async function checkFirmwareUpdate(): Promise<FirmwareUpdateInfo | null> {
+    try {
+        return await invoke<FirmwareUpdateInfo | null>("check_firmware_update");
+    } catch (error) {
+        console.error("Fehler beim Prüfen auf Firmware-Updates:", error);
+        return null;
+    }
+}
+
+export async function downloadAndFlashFirmware(downloadUrl: string): Promise<void> {
+    await invoke("download_and_flash_firmware", { downloadUrl });
+}
+
+export async function requestFirmwareVersion(): Promise<void> {
+    await sendToPico("GetVersion");
 }

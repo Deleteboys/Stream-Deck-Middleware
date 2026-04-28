@@ -47,6 +47,9 @@ pub fn start_serial_thread(
                                 println!("Initial config request failed: {}", e);
                             }
                         }
+                        if let Ok(slice) = postcard::to_slice(&HostToPico::GetVersion, &mut buf) {
+                            let _ = port.write_all(slice).and_then(|_| port.flush());
+                        }
 
                         current_port = Some(port);
                         current_port_name = Some(port_name);
@@ -95,6 +98,10 @@ pub fn start_serial_thread(
                         match postcard::take_from_bytes::<PicoToHost>(&accumulator) {
                             Ok((msg, rest)) => {
                                 let _ = app.emit("pico-event", msg.clone());
+
+                                if let PicoToHost::Version { version } = &msg {
+                                    let _ = app.emit("pico-version", version.as_str());
+                                }
 
                                 if let Some(logical_trigger) = tracker.process_event(msg) {
                                     // Hier locken wir den Manager kurz, um die Aktion auszuführen

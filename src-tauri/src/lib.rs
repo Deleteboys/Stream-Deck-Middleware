@@ -16,12 +16,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::sync::{mpsc, Arc};
 use std::thread;
-use sysinfo::{ProcessesToUpdate, System};
-use tauri::{
-    menu::{Menu, MenuItem},
-    tray::{TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, RunEvent, State, WindowEvent,
-};
+use std::time::Duration;
+use sysinfo::{Disks, ProcessesToUpdate, System};
+use tauri::{menu::{Menu, MenuItem}, tray::{TrayIconBuilder, TrayIconEvent}, AppHandle, Emitter, Manager, RunEvent, State, WindowEvent};
 
 const WINDOW_STATE_FILE: &str = "window-state.json";
 
@@ -198,6 +195,8 @@ pub fn run() {
             remove_mapping,
             get_active_processes,
             sync_mappings,
+            check_firmware_update,
+            download_and_flash_firmware,
             set_icon_slot
         ])
         .setup(move |app| {
@@ -577,4 +576,96 @@ fn get_active_processes() -> Vec<String> {
     names.dedup();
 
     names
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FirmwareUpdateInfo {
+    pub version: String,
+    pub download_url: String,
+}
+
+// 1. Prüft GitHub auf das neueste Release
+#[tauri::command]
+async fn check_firmware_update() -> Result<Option<FirmwareUpdateInfo>, String> {
+    let client = reqwest::Client::builder()
+        .user_agent("StreamDeck-Middleware") // GitHub verlangt einen User-Agent
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    // WICHTIG: Ersetze dies durch deinen echten GitHub Repo-Pfad!
+    let url = "https://api.github.com/repos/Deleteboys/Stream-Deck-Firmeware/releases/latest";
+
+    let response = client.get(url).send().await.map_err(|e| e.to_string())?;
+
+    if !response.status().is_success() {
+        return Ok(None); // Kein Release gefunden oder privates Repo
+    }
+
+    let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
+
+    let version = json["tag_name"].as_str().unwrap_or("").to_string();
+
+    // Suche nach der .uf2 Datei in den Assets
+    let download_url = json["assets"].as_array()
+        .and_then(|assets| {
+            assets.iter().find(|a| {
+                a["name"].as_str().unwrap_or("").ends_with(".uf2")
+            })
+        })
+        .and_then(|asset| asset["browser_download_url"].as_str())
+        .map(|s| s.to_string());
+
+    if let Some(url) = download_url {
+        Ok(Some(FirmwareUpdateInfo { version, download_url: url }))
+    } else {
+        Ok(None)
+    }
+}
+
+// 2. Führt den eigentlichen Flash-Vorgang durch
+#[tauri::command]
+async fn download_and_flash_firmware(app: AppHandle, download_url: String) -> Result<(), String> {
+    let _ = app.emit("fw-status", "Lade Firmware herunter...");
+
+    // 1. Herunterladen in ein Temp-Verzeichnis
+    let response = reqwest::get(&download_url).await.map_err(|e| e.to_string())?;
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+
+    let temp_dir = std::env::temp_dir();
+    let fw_path = temp_dir.join("update.uf2");
+    fs::write(&fw_path, bytes).map_err(|e| e.to_string())?;
+
+    let _ = app.emit("fw-status", "Warte auf Bootloader-Laufwerk...");
+
+    // 2. Warten, bis der Pico als Laufwerk "RPI-RP2" auftaucht (Max 15 Sekunden)
+    let mut disks = Disks::new();
+    let mut pico_mount_point: Option<PathBuf> = None;
+
+    for _ in 0..30 {
+        disks.refresh(true);
+        for disk in &disks {
+            if disk.name().to_string_lossy().contains("RPI-RP2") {
+                pico_mount_point = Some(disk.mount_point().to_path_buf());
+                break;
+            }
+        }
+
+        if pico_mount_point.is_some() {
+            break;
+        }
+        thread::sleep(Duration::from_millis(500));
+    }
+
+    let dest_dir = pico_mount_point.ok_or("Pico Laufwerk (RPI-RP2) wurde nicht gefunden. Ist der Bootloader aktiv?")?;
+    let dest_file = dest_dir.join("update.uf2");
+
+    let _ = app.emit("fw-status", "Kopiere Firmware auf den Pico...");
+
+    // 3. UF2 Datei kopieren (Das löst automatisch den Flash & Reboot des Picos aus)
+    fs::copy(&fw_path, &dest_file).map_err(|e| format!("Fehler beim Kopieren: {}", e))?;
+
+    // Aufräumen
+    let _ = fs::remove_file(fw_path);
+
+    Ok(())
 }
