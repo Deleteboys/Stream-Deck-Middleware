@@ -130,7 +130,7 @@
       <v-card color="#18181b" variant="flat" class="border border-zinc-800 rounded-lg overflow-hidden mb-8">
         <div class="d-flex justify-space-between align-center px-4 py-3 border-b border-zinc-700">
           <div class="text-body-2 text-grey">Auto-Start mit Windows</div>
-          <v-switch color="primary" base-color="#3f3f46" hide-details density="compact" @update:model-value="toggleAutostart"></v-switch>
+          <v-switch :model-value="autostartEnabled" @update:model-value="toggleAutostart" color="primary" base-color="#3f3f46" hide-details density="compact"></v-switch>
         </div>
         <div class="d-flex justify-space-between align-center px-4 py-3 border-b border-zinc-700">
           <div>
@@ -282,10 +282,9 @@ onUnmounted(() => {
   if (unlistenVersion) unlistenVersion();
 });
 
-const toggleStartMinimized = async (val: boolean) => {
+const toggleStartMinimized = async (val: boolean | null) => {
   try {
-    console.log("Start minimiert: " + val);
-    await setStartMinimized(val);
+    await setStartMinimized(!!val);
   } catch (e) {
     console.error("Fehler beim Speichern der Start-Einstellung", e);
   }
