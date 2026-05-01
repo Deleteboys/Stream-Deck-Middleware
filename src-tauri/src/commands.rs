@@ -282,11 +282,11 @@ pub fn get_active_processes() -> Vec<String> {
 #[tauri::command]
 pub async fn check_firmware_update() -> Result<Option<FirmwareUpdateInfo>, String> {
     let client = reqwest::Client::builder()
-        .user_agent("StreamDeck-Middleware")
+        .user_agent("Nova-Deck-Middleware")
         .build()
         .map_err(|e| e.to_string())?;
 
-    let url = "https://api.github.com/repos/Deleteboys/Stream-Deck-Firmeware/releases/latest";
+    let url = "https://api.github.com/repos/Deleteboys/Nova-Deck-Firmeware/releases/latest";
     let response = client.get(url).send().await.map_err(|e| e.to_string())?;
 
     if !response.status().is_success() {

@@ -3,7 +3,7 @@ import ConfigView from '../views/ConfigView.vue'
 import TestView from '../views/TestView.vue'
 import SettingsView from '../views/SettingsView.vue'
 
-const LAST_ROUTE_KEY = 'streamdeck:last-route'
+const LAST_ROUTE_KEY = 'nova-deck:last-route'
 
 const routes: RouteRecordRaw[] = [
     {

@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    streamdeckmiddleware_lib::run()
+    novadeckmiddleware_lib::run()
 }
