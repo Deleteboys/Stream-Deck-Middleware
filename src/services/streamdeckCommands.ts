@@ -300,3 +300,11 @@ export async function downloadAndFlashFirmware(downloadUrl: string): Promise<voi
 export async function requestFirmwareVersion(): Promise<void> {
     await sendToPico("GetVersion");
 }
+
+export async function setStartMinimized(value: boolean): Promise<void> {
+    await invoke("set_start_minimized", { value });
+}
+
+export async function getStartMinimized(): Promise<boolean> {
+    return await invoke("get_start_minimized");
+}

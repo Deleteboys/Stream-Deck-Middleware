@@ -20,6 +20,7 @@ use std::thread;
 use std::time::Duration;
 use sysinfo::{Disks, ProcessesToUpdate, System};
 use tauri::{menu::{Menu, MenuItem}, tray::{TrayIconBuilder, TrayIconEvent}, AppHandle, Emitter, Manager, RunEvent, State, WindowEvent};
+use tauri_plugin_autostart::MacosLauncher;
 
 const WINDOW_STATE_FILE: &str = "window-state.json";
 
@@ -30,6 +31,8 @@ struct PersistedWindowState {
     width: u32,
     height: u32,
     maximized: bool,
+    #[serde(default)]
+    start_minimized: bool,
 }
 
 // State, um vom UI Befehle an den Hintergrund-Thread zu schicken
@@ -51,6 +54,27 @@ fn send_to_pico(state: State<AppState>, command: HostToPico) -> Result<(), Strin
     } else {
         Err("Keine Verbindung zum seriellen Thread".into())
     }
+}
+
+#[tauri::command]
+fn set_start_minimized(app: AppHandle, value: bool) {
+    if let Some(window) = app.get_webview_window("main") {
+        let mut state = capture_window_state(&window).unwrap_or(PersistedWindowState {
+            x: 100, y: 100, width: 800, height: 600, maximized: false, start_minimized: value
+        });
+        state.start_minimized = value;
+
+        if let Some(path) = window_state_path(&app) {
+            if let Ok(serialized) = serde_json::to_string(&state) {
+                let _ = std::fs::write(path, serialized);
+            }
+        }
+    }
+}
+
+#[tauri::command]
+fn get_start_minimized(app: AppHandle) -> bool {
+    load_window_state(&app).map(|s| s.start_minimized).unwrap_or(false)
 }
 
 #[tauri::command]
@@ -83,12 +107,16 @@ fn capture_window_state(window: &tauri::WebviewWindow) -> Option<PersistedWindow
         return None;
     }
 
+    let old_state = load_window_state(&window.app_handle());
+    let current_start_minimized = old_state.map(|s| s.start_minimized).unwrap_or(false);
+
     Some(PersistedWindowState {
         x: position.x,
         y: position.y,
         width: size.width,
         height: size.height,
         maximized: window.is_maximized().unwrap_or(false),
+        start_minimized: current_start_minimized,
     })
 }
 
@@ -190,7 +218,7 @@ pub fn run() {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
-        // 1. AppState registrieren, damit `send_to_pico` darauf zugreifen kann
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec!["--autostart"])))
         .manage(AppState {
             serial_tx: Mutex::new(Some(tx)),
             is_quitting: Mutex::new(false),
@@ -209,7 +237,9 @@ pub fn run() {
             check_firmware_update,
             download_and_flash_firmware,
             set_icon_slot,
-            update_monitor_mapping
+            update_monitor_mapping,
+            set_start_minimized,
+            get_start_minimized
         ])
         .setup(move |app| {
             // --- TRAY MENU SETUP ---
@@ -257,8 +287,16 @@ pub fn run() {
 
             // --- FENSTER LOGIK ---
             if let Some(window) = app.get_webview_window("main") {
-                if let Some(state) = load_window_state(&app.handle()) {
-                    apply_window_state(&window, &state);
+                let state = load_window_state(&app.handle());
+                if let Some(s) = &state {
+                    apply_window_state(&window, s);
+                    if s.start_minimized {
+                        let _ = window.hide();
+                    } else {
+                        let _ = window.show();
+                    }
+                } else {
+                    let _ = window.show();
                 }
             }
 

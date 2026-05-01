@@ -51,8 +51,6 @@
                   color="primary"
                   hide-details
                   density="compact"
-                  inset
-                  style="flex: 0 0 auto;"
               ></v-switch>
             </div>
           </template>

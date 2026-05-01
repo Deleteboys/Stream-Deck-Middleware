@@ -4,7 +4,7 @@
 
       <div class="mb-4">
         <div class="d-flex align-center text-caption text-primary uppercase tracking-widest font-weight-bold mb-1">
-          <v-icon size="small" class="mr-2">mdi-microchip</v-icon>
+          <v-icon size="small" class="mr-2">mdi-chip</v-icon>
           Firmware
         </div>
       </div>
@@ -35,7 +35,9 @@
         <div class="d-flex justify-space-between align-center px-4 py-3">
           <div>
             <div class="text-body-2 text-grey">Manueller Bootloader</div>
-            <div class="text-caption text-zinc-500" style="font-size: 0.7rem !important;">Startet das Gerät im USB-Speicher-Modus</div>
+            <div class="text-caption text-zinc-500" style="font-size: 0.7rem !important;">Startet das Gerät im
+              USB-Speicher-Modus
+            </div>
           </div>
           <v-btn
               variant="tonal"
@@ -68,7 +70,8 @@
           <div class="pa-5">
             <v-window v-model="updatePhase" :touch="false">
               <v-window-item :value="1">
-                <div class="d-flex align-center justify-space-between mb-5 pa-4 bg-zinc-900 rounded-lg border border-zinc-800">
+                <div
+                    class="d-flex align-center justify-space-between mb-5 pa-4 bg-zinc-900 rounded-lg border border-zinc-800">
                   <div class="text-center flex-1-1-0">
                     <div class="text-caption text-grey mb-1">Aktuell</div>
                     <div class="text-caption font-weight-bold text-zinc-500 font-monospace">{{ currentVersion }}</div>
@@ -93,9 +96,11 @@
 
               <v-window-item :value="2">
                 <div class="text-center py-4">
-                  <v-progress-circular indeterminate color="primary" size="40" width="3" class="mb-4"></v-progress-circular>
+                  <v-progress-circular indeterminate color="primary" size="40" width="3"
+                                       class="mb-4"></v-progress-circular>
                   <div class="text-body-2 text-white font-weight-medium mb-4">{{ statusMessage }}</div>
-                  <v-progress-linear v-model="updateProgress" color="primary" height="4" rounded bg-color="zinc-800"></v-progress-linear>
+                  <v-progress-linear v-model="updateProgress" color="primary" height="4" rounded
+                                     bg-color="zinc-800"></v-progress-linear>
                 </div>
               </v-window-item>
 
@@ -125,13 +130,29 @@
       <v-card color="#18181b" variant="flat" class="border border-zinc-800 rounded-lg overflow-hidden mb-8">
         <div class="d-flex justify-space-between align-center px-4 py-3 border-b border-zinc-700">
           <div class="text-body-2 text-grey">Auto-Start mit Windows</div>
-          <v-switch color="primary" hide-details density="compact" inset style="flex: 0 0 auto;"></v-switch>
+          <v-switch color="primary" base-color="#3f3f46" hide-details density="compact" @update:model-value="toggleAutostart"></v-switch>
         </div>
-
         <div class="d-flex justify-space-between align-center px-4 py-3 border-b border-zinc-700">
-          <div class="text-body-2 text-grey">Vibration standardmäßig an</div>
-          <v-switch color="primary" hide-details density="compact" inset style="flex: 0 0 auto;"></v-switch>
+          <div>
+            <div class="text-body-2 text-grey">Minimiert starten</div>
+            <div class="text-caption text-zinc-500" style="font-size: 0.7rem !important;">
+              App startet nur im System-Tray
+            </div>
+          </div>
+          <v-switch
+              v-model="startMinimized"
+              @update:model-value="toggleStartMinimized"
+              color="primary"
+              base-color="#3f3f46"
+              hide-details
+              density="compact">
+          </v-switch>
         </div>
+<!--        <div class="d-flex justify-space-between align-center px-4 py-3 border-b border-zinc-700">-->
+<!--          <div class="text-body-2 text-grey">Vibration standardmäßig an</div>-->
+<!--          <v-switch color="primary" base-color="#3f3f46" hide-details density="compact" disabled></v-switch>-->
+<!--        </div>-->
+
 
         <div class="d-flex justify-space-between align-center px-4 py-3">
           <div class="text-body-2 text-grey">Middleware Version</div>
@@ -163,7 +184,8 @@
           Bootloader starten?
         </v-card-title>
         <v-card-text class="text-body-2 text-grey px-5 pb-6">
-          Das Gerät wird in den USB-Speicher-Modus versetzt und reagiert kurzzeitig nicht mehr als Streamdeck. Fortfahren?
+          Das Gerät wird in den USB-Speicher-Modus versetzt und reagiert kurzzeitig nicht mehr als Streamdeck.
+          Fortfahren?
         </v-card-text>
         <v-card-actions class="px-5 pb-4">
           <v-spacer></v-spacer>
@@ -184,15 +206,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
+import {ref, onMounted, onUnmounted} from "vue";
 import {
   startBootloader,
   checkFirmwareUpdate,
   downloadAndFlashFirmware,
-  requestFirmwareVersion
+  requestFirmwareVersion,
+  setStartMinimized, getStartMinimized
 } from "@/services/streamdeckCommands";
-import { getVersion } from "@tauri-apps/api/app";
+import {getVersion} from "@tauri-apps/api/app";
 import {emit, listen} from "@tauri-apps/api/event";
+import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
 
 // UI State Firmware
 const updatePhase = ref(1);
@@ -217,9 +241,16 @@ const appVersion = ref("0.0.0");
 let unlistenStatus: (() => void) | null = null;
 let unlistenVersion: (() => void) | null = null;
 
+const autostartEnabled = ref(false);
+
+const startMinimized = ref(false);
+
 onMounted(async () => {
   try {
     appVersion.value = await getVersion();
+
+    autostartEnabled.value = await isEnabled();
+    startMinimized.value = await getStartMinimized();
 
     // Listener für Flash-Status (Events vom Rust-Backend)
     unlistenStatus = await listen<string>("fw-status", (event) => {
@@ -250,6 +281,44 @@ onUnmounted(() => {
   if (unlistenStatus) unlistenStatus();
   if (unlistenVersion) unlistenVersion();
 });
+
+const toggleStartMinimized = async (val: boolean) => {
+  try {
+    console.log("Start minimiert: " + val);
+    await setStartMinimized(val);
+  } catch (e) {
+    console.error("Fehler beim Speichern der Start-Einstellung", e);
+  }
+};
+
+const toggleAutostart = async (newValue: boolean | null) => {
+  // Vuetify wirft den neuen Wert in das Event (true wenn angeschaltet, false wenn ausgeschaltet)
+  const shouldBeEnabled = !!newValue;
+
+  try {
+    if (shouldBeEnabled) {
+      await enable();
+      console.log("Autostart erfolgreich aktiviert.");
+    } else {
+      try {
+        await disable();
+        console.log("Autostart erfolgreich deaktiviert.");
+      } catch (disableError) {
+        if (String(disableError).includes('os error 2')) {
+          console.log("War bereits deaktiviert, alles gut.");
+        } else {
+          throw disableError;
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Fehler beim Ändern der Autostart-Einstellungen:", error);
+  } finally {
+    // Egal was passiert ist: Wir zwingen den Schalter am Ende,
+    // den ECHTEN Status von Windows anzuzeigen.
+    autostartEnabled.value = await isEnabled();
+  }
+};
 
 // --- Firmware Logic ---
 const performUpdateCheck = async () => {
@@ -323,7 +392,7 @@ const manualMiddlewareCheck = async () => {
   isCheckingMiddleware.value = true;
 
   try {
-    await emit("trigger-update-check", { manual: true });
+    await emit("trigger-update-check", {manual: true});
   } catch (error) {
     console.error("Fehler beim Senden des Update-Events:", error);
   } finally {
