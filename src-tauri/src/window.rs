@@ -115,8 +115,7 @@ pub fn show_or_create_main_window(app: &AppHandle) {
             "main",
             tauri::WebviewUrl::App("index.html".into()),
         )
-            .title("Mein Programm")
-            .build();
+        .build();
 
         if let Ok(window) = window {
             if let Some(state) = load_window_state(app) {

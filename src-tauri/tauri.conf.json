@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "streamdeckmiddleware",
+  "productName": "NovaDeck",
   "version": "0.7.2",
-  "identifier": "com.streamdeckmiddleware.app",
+  "identifier": "novadeck",
   "build": {
     "beforeDevCommand": "yarn dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "StreamDeck Settings",
+        "title": "Nova Deck",
         "width": 1280,
         "height": 720,
         "label": "main",
@@ -43,7 +43,8 @@
       "active": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM3MkFDM0RCRkU1OUQwNUYKUldSZjBGbisyOE1xTjlyK0hmZEpSK3FVNVNac3BmR3RTRGpDeEdYbnNtQW9LZXN3aTQybjZuMHMK",
       "endpoints": [
-        "https://github.com/Deleteboys/Stream-Deck-Middleware/releases/latest/download/latest.json"
+        "https://github.com/Deleteboys/Stream-Deck-Middleware/releases/latest/download/latest.json",
+        "https://github.com/Deleteboys/Nova-Deck-Middleware/releases/latest/download/latest.json"
       ]
     }
   }
