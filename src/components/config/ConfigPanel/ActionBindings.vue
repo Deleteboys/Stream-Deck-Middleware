@@ -221,7 +221,8 @@ const actionsLibrary = [
   { title: 'App Audio (Toggle)', icon: 'mdi-volume-off', config: { type: 'ToggleAppAudio', process_name: '' } },
   { title: 'Global Mute (Toggle)', icon: 'mdi-volume-mute', config: { type: 'ToggleMasterMute' } },
   { title: 'Current Window (Volume)', icon: 'mdi-monitor-speaker', config: { type: 'ForegroundVolume', step: 5 } },
-  { title: 'Aktuelles Fenster (Toggle)', icon: 'mdi-speaker-off', config: { type: 'ToggleForegroundAudio' } }
+  { title: 'Aktuelles Fenster (Toggle)', icon: 'mdi-speaker-off', config: { type: 'ToggleForegroundAudio' } },
+  { title: 'App Media (Play/Pause)', icon: 'mdi-play-pause', config: { type: 'ToggleAppMedia', process_name: '' } }
 ];
 
 // --- COMPUTED ---
@@ -255,7 +256,7 @@ const boundActionsList = computed(() => {
     const hasStep = config && 'step' in config;
     const hasKey = config && 'key' in config && type === 'PressKey';
     const hasMediaKey = config && 'key' in config && type === 'MediaControl';
-    const needsProcess = type === 'ToggleAppAudio' || type === 'AppVolume';
+    const needsProcess = type === 'ToggleAppAudio' || type === 'AppVolume' || type === 'ToggleAppMedia';
     const hasSettings = hasStep || hasKey || hasMediaKey || needsProcess;
 
     return {

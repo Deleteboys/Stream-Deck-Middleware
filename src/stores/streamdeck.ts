@@ -95,11 +95,11 @@ const isActionConfig = (value: unknown): value is ActionConfig => {
         config.type === 'ToggleAudio' ||
         config.type === 'MasterVolume' ||
         config.type === 'ToggleAppAudio' ||
-        config.type === 'MasterVolume' ||
         config.type === 'ToggleMasterMute' ||
         config.type === 'AppVolume' ||
         config.type === 'ForegroundVolume' ||
-        config.type === 'ToggleForegroundAudio'
+        config.type === 'ToggleForegroundAudio' ||
+        config.type === 'ToggleAppMedia'
     )
 }
 

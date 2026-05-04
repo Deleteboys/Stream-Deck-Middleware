@@ -26,6 +26,7 @@ pub enum ActionConfig {
     AppVolume { process_name: String, step: i8 },
     ForegroundVolume { step: i8 },
     ToggleForegroundAudio,
+    ToggleAppMedia { process_name: String },
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -117,6 +118,9 @@ fn create_action(
         }
         ActionConfig::ToggleForegroundAudio => {
             Box::new(modules::toggle_foreground_audio::ToggleForegroundAudioAction {})
+        }
+        ActionConfig::ToggleAppMedia { process_name } => {
+            Box::new(modules::toggle_app_media_action::ToggleAppMediaAction { process_name })
         }
         _ => {
             println!("WARNUNG: Aktion noch nicht implementiert!");

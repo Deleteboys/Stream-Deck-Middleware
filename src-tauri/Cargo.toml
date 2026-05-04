@@ -29,7 +29,7 @@ heapless = { version = "0.9.2", features = ["serde"] }
 enigo = "0.6.1"
 dotenvy = "0.15.7"
 rspotify = { version = "0.16", features = ["cli"] }
-windows = { version = "0.62.2", features = ["Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_System_Com", "Win32_System_ProcessStatus", "Win32_System_Threading", "Win32_Foundation", "Win32_System_Variant", "Win32_System_Com_StructuredStorage", "Win32_Devices", "Win32_Devices_FunctionDiscovery", "Win32_UI_Shell_PropertiesSystem", "Win32_UI_WindowsAndMessaging"] }
+windows = { version = "0.62.2", features = ["Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_System_Com", "Win32_System_ProcessStatus", "Win32_System_Threading", "Win32_Foundation", "Win32_System_Variant", "Win32_System_Com_StructuredStorage", "Win32_Devices", "Win32_Devices_FunctionDiscovery", "Win32_UI_Shell_PropertiesSystem", "Win32_UI_WindowsAndMessaging", "Foundation", "Foundation_Collections", "Media_Control", ] }
 sysinfo = "0.38.4"
 reqwest = { version = "0.13.3", features = ["json", "stream"] }
 tauri-plugin-autostart = "2.5.1"
