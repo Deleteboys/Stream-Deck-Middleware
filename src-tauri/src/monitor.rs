@@ -95,7 +95,7 @@ pub fn start_monitoring(
                     }
                 }
             }
-            thread::sleep(Duration::from_millis(150));
+            thread::sleep(Duration::from_millis(250));
         }
     });
 }
