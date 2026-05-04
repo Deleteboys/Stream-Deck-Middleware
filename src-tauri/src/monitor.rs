@@ -77,11 +77,21 @@ pub fn start_monitoring(
                     }
                 } else {
                     if 255 != last_volumes[i] {
+                        let slot_index = i as u8;
                         let _ = tx.send(HostToPico::SetVolume {
-                            slot: i as u8,
+                            slot: slot_index,
                             volume: 255,
                         });
                         last_volumes[i] = 255;
+
+                        let _ = app_handle.emit(
+                            "audio-update",
+                            AudioUpdatePayload {
+                                slot: slot_index,
+                                volume: last_volumes[i],
+                                muted: last_mutes[i],
+                            },
+                        );
                     }
                 }
             }
