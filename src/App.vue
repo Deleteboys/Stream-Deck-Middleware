@@ -26,9 +26,12 @@ import {
 } from '@/services/streamdeckCommands';
 import TopBar from "./components/layout/TopBar.vue";
 import AppUpdater from "@/components/AppUpdater.vue";
+import {attachConsole} from "@tauri-apps/plugin-log";
 
 const store = useStreamDeckStore();
 const unlistenCallbacks: UnlistenFn[] = [];
+
+let detachLogs: (() => void) | null = null;
 
 type PicoConfigEvent = {
   Config: {
@@ -49,7 +52,33 @@ const extractConfig = (payload: unknown): DeviceConfig | null => {
   return configEvent.Config.config;
 };
 
-onMounted(() => {
+onMounted(async () => {
+
+  detachLogs = await attachConsole();
+
+  // 2. Browser-Konsole abfangen und in den Store leiten
+  const consoleMethods = [
+    { method: 'error', level: 1 },
+    { method: 'warn', level: 2 },
+    { method: 'info', level: 3 },
+    { method: 'debug', level: 4 },
+    { method: 'trace', level: 5 },
+    { method: 'log', level: 3 }
+  ] as const;
+
+  consoleMethods.forEach(({ method, level }) => {
+    const originalFn = (console as any)[method];
+
+    (console as any)[method] = (...args: any[]) => {
+      originalFn(...args);
+
+      const message = args
+          .map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a)))
+          .join(' ');
+
+      store.addLog(message, level);
+    };
+  });
   store.initHardwareWatcher();
 
   store.syncActiveProfileMappingsToBackend().catch((error) => {
@@ -98,6 +127,7 @@ watch(
 );
 
 onUnmounted(() => {
+  if (detachLogs) detachLogs();
   for (const unlisten of unlistenCallbacks) {
     unlisten();
   }

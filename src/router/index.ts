@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import ConfigView from '../views/ConfigView.vue'
-import TestView from '../views/TestView.vue'
+import DevToolsView from '../views/DevToolsView.vue'
 import SettingsView from '../views/SettingsView.vue'
 
 const LAST_ROUTE_KEY = 'nova-deck:last-route'
@@ -12,9 +12,9 @@ const routes: RouteRecordRaw[] = [
         component: ConfigView
     },
     {
-        path: '/test',
-        name: 'test',
-        component: TestView
+        path: '/dev',
+        name: 'dev',
+        component: DevToolsView
     },
     {
         path: '/settings',

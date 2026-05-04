@@ -1,5 +1,6 @@
 use crate::action::actions::Action;
 use std::fmt::Debug;
+use tauri_plugin_log::log::{debug, info};
 use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
 
 #[derive(Debug, Clone)]
@@ -22,7 +23,7 @@ impl Action for ToggleAppMediaAction {
 
                     for session in sessions {
                         let app_id = session.SourceAppUserModelId()?.to_string();
-
+                        debug!("Found app ID: {}", app_id);
                         if app_id.to_lowercase().contains(&target_app) {
                             let op = session.TryTogglePlayPauseAsync()?;
                             pending_operations.push((app_id, op));
@@ -31,14 +32,14 @@ impl Action for ToggleAppMediaAction {
                 }
                 for (app_id, op) in pending_operations {
                     op.await?;
-                    println!("Media-Status (Play/Pause) für {} getoggelt.", app_id);
+                    info!("Media-Status (Play/Pause) für {} getoggelt.", app_id);
                 }
 
                 Ok(())
             }.await;
 
             if let Err(e) = result {
-                println!("Fehler beim Toggeln der Medien für {}: {}", name, e);
+                info!("Fehler beim Toggeln der Medien für {}: {}", name, e);
             }
         });
     }

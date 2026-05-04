@@ -59,7 +59,7 @@ const store = useStreamDeckStore()
 
 const navItems = [
   { id: 'config', label: 'Konfigurator', path: '/' },
-  { id: 'test', label: 'Hardware Test', path: '/test' },
+  { id: 'dev', label: 'Dev Tools', path: '/dev' },
   { id: 'settings', label: 'Settings', path: '/settings' }
 ]
 </script>

@@ -126,7 +126,8 @@ export const useStreamDeckStore = defineStore('streamdeck', {
             saturation: 255,
             spread: 120,
             reverse: false
-        } as any
+        } as any,
+        debugLogs: [] as { message: string; level: number; timestamp: string }[],
     }),
 
     getters: {
@@ -148,7 +149,16 @@ export const useStreamDeckStore = defineStore('streamdeck', {
                 console.warn('Persisted StreamDeck config could not be saved:', error)
             }
         },
+        addLog(message: string, level: number) {
+            const timestamp = new Date().toLocaleTimeString();
+            this.debugLogs.unshift({ message, level, timestamp });
 
+            // Optional: Limitiere die Anzahl der Logs auf 100
+            if (this.debugLogs.length > 100) this.debugLogs.pop();
+        },
+        clearLogs() {
+            this.debugLogs = [];
+        },
         async syncOledIconsToBackend() {
             const slots = this.activeProfile?.keys['oled-display']?.slots;
             if (!slots) return;
