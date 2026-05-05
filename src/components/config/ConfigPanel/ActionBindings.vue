@@ -156,7 +156,6 @@ import { useStreamDeckStore } from '@/stores/streamdeck';
 import {
   updateActionMapping,
   removeActionMapping,
-  getActiveProcesses,
   getAudioDevices,
   type TriggerType,
   type AudioDeviceInfo, getActiveAudioProcesses
