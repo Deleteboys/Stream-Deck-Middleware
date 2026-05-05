@@ -53,7 +53,7 @@ export interface AudioDeviceInfo {
 }
 
 // --- PROPS ---
-const props = defineProps<{
+defineProps<{
   device1: string | undefined;
   device2: string | undefined;
   audioDevices: AudioDeviceInfo[];

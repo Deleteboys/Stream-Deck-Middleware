@@ -45,7 +45,7 @@
 import { ref } from 'vue';
 
 // --- PROPS ---
-const props = defineProps<{
+defineProps<{
   step: number;
 }>();
 

@@ -83,6 +83,7 @@ pub fn run() {
             commands::update_mapping,
             commands::remove_mapping,
             commands::get_active_processes,
+            commands::get_active_audio_processes,
             commands::sync_mappings,
             commands::check_firmware_update,
             commands::download_and_flash_firmware,

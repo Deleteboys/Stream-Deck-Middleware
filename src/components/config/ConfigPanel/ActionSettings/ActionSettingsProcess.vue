@@ -27,7 +27,7 @@
 
 <script setup lang="ts">
 // --- PROPS ---
-const props = defineProps<{
+defineProps<{
   processName: string | undefined;
   processes: string[];
 }>();

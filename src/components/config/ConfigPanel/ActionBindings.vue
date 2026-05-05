@@ -159,7 +159,7 @@ import {
   getActiveProcesses,
   getAudioDevices,
   type TriggerType,
-  type AudioDeviceInfo
+  type AudioDeviceInfo, getActiveAudioProcesses
 } from '@/services/streamdeckCommands';
 
 import ActionSettingsKey from './ActionSettings/ActionSettingsKey.vue';
@@ -282,7 +282,7 @@ const boundActionsList = computed(() => {
 });
 
 const fetchProcesses = async () => {
-  try { activeProcesses.value = await getActiveProcesses(); } catch (e) { console.error(e); }
+  try { activeProcesses.value = await getActiveAudioProcesses(); } catch (e) { console.error(e); }
 };
 
 const fetchAudioDevices = async () => {

@@ -271,6 +271,16 @@ export async function getActiveProcesses(): Promise<string[]> {
         throw error;
     }
 }
+
+export async function getActiveAudioProcesses(): Promise<string[]> {
+    try {
+        return await invoke<string[]>("get_active_audio_processes");
+    } catch (error) {
+        console.error("Fehler beim Abrufen der aktiven Prozesse in Rust:", error);
+        throw error;
+    }
+}
+
 export async function syncActionMappings(mappings: MappingPayload[]): Promise<void> {
     try {
         await invoke("sync_mappings", {mappings});

@@ -23,7 +23,7 @@ export interface MediaKeyOption {
 }
 
 // --- PROPS ---
-const props = defineProps<{
+defineProps<{
   actionKey: string | undefined;
   mediaKeys: MediaKeyOption[];
 }>();

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use crate::action::actions::{ButtonEvent, EncoderEvent, HardwareTrigger};
 use crate::modules;
 use crate::protocol::{HostToPico, IconType};
@@ -11,6 +12,9 @@ use std::time::Duration;
 use log::error;
 use sysinfo::{Disks, ProcessesToUpdate, System};
 use tauri::{AppHandle, Emitter, Manager, State};
+use windows::core::Interface;
+use windows::Win32::Media::Audio::{eConsole, eRender, IAudioSessionControl2, IAudioSessionManager2, IMMDeviceEnumerator, MMDeviceEnumerator};
+use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_APARTMENTTHREADED};
 use crate::audio::{list_audio_devices, AudioDeviceInfo};
 // --- Datenstrukturen für Mappings ---
 
@@ -292,6 +296,62 @@ pub fn get_active_processes() -> Vec<String> {
 
     names.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
     names.dedup();
+    names
+}
+
+#[tauri::command]
+pub fn get_active_audio_processes() -> Vec<String> {
+    let mut audio_pids = HashSet::new();
+
+    unsafe {
+        // COM initialisieren
+        if CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok() {
+            // Wir trennen den Aufruf von der Zuweisung, damit wir den Typ sauber annotieren können
+            let enumerator_result: windows::core::Result<IMMDeviceEnumerator> = CoCreateInstance(
+                &MMDeviceEnumerator,
+                None,
+                CLSCTX_ALL,
+            );
+
+            if let Ok(enumerator) = enumerator_result {
+                if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
+                    // Bei .Activate ist die Turbofish-Syntax ::<Type> erlaubt und nötig
+                    if let Ok(manager) = device.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None) {
+                        if let Ok(session_enumerator) = manager.GetSessionEnumerator() {
+                            let count = session_enumerator.GetCount().unwrap_or(0);
+
+                            for i in 0..count {
+                                if let Ok(session) = session_enumerator.GetSession(i) {
+                                    if let Ok(session2) = session.cast::<IAudioSessionControl2>() {
+                                        if let Ok(pid) = session2.GetProcessId() {
+                                            if pid > 0 {
+                                                audio_pids.insert(pid);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Namen über sysinfo auflösen
+    let mut sys = System::new_all();
+    sys.refresh_processes(ProcessesToUpdate::All, true);
+
+    let mut names: Vec<String> = sys
+        .processes()
+        .iter()
+        .filter(|(pid, _)| audio_pids.contains(&pid.as_u32()))
+        .map(|(_, p)| p.name().to_string_lossy().into_owned())
+        .collect();
+
+    names.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+    names.dedup();
+
     names
 }
 

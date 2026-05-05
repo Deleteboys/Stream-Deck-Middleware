@@ -15,7 +15,7 @@
 
 <script setup lang="ts">
 // --- PROPS ---
-const props = defineProps<{
+defineProps<{
   actionKey: string | undefined;
   keysList: string[];
 }>();
