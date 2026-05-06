@@ -90,6 +90,7 @@ const isActionConfig = (value: unknown): value is ActionConfig => {
 
     return (
         config.type === 'PressKey' ||
+        config.type === 'CustomMacro' ||
         config.type === 'MediaControl' ||
         config.type === 'SpotifyVolume' ||
         config.type === 'MasterVolume' ||

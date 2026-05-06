@@ -8,3 +8,4 @@ pub(crate) mod toggle_foreground_audio;
 pub(crate) mod toggle_master_mute;
 pub(crate) mod toggle_app_media_action;
 pub(crate) mod switch_audio_device;
+pub(crate) mod macro_action;

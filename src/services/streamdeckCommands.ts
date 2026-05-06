@@ -19,6 +19,7 @@ export type AudioDeviceInfo = {
 
 export type ActionConfig =
     | { type: 'PressKey'; key: string }
+    | { type: 'CustomMacro'; key: string }
     | { type: 'MediaControl'; key: string }
     | { type: 'SpotifyVolume'; step: number }
     | { type: 'MasterVolume'; step: number }

@@ -143,6 +143,12 @@
               @refresh="fetchAudioDevices"
           />
 
+          <ActionSettingsMacro
+              v-if="item.isCustomMacro"
+              :action-key="item.key"
+              @update:action-key="(val) => updateActionKey(item.triggerValue, val)"
+          />
+
         </div>
         <ActionSettingsInfo v-else />
       </v-card>
@@ -167,6 +173,7 @@ import ActionSettingsVolume from './ActionSettings/ActionSettingsVolume.vue';
 import ActionSettingsProcess from './ActionSettings/ActionSettingsProcess.vue';
 import ActionSettingsAudio from './ActionSettings/ActionSettingsAudio.vue';
 import ActionSettingsInfo from './ActionSettings/ActionSettingsInfo.vue';
+import ActionSettingsMacro from "@/components/config/ConfigPanel/ActionSettings/ActionSettingsMacro.vue";
 
 const store = useStreamDeckStore();
 
@@ -191,6 +198,7 @@ const categorizedActions = [
       { title: 'Global Mute (Toggle)', icon: 'mdi-volume-mute', config: { type: 'ToggleMasterMute' } },
       { title: 'Switch Audio Device', icon: 'mdi-swap-horizontal', config: { type: 'SwitchAudioDevice', device1: '', device2: '' } },
       { title: 'Taste drücken', icon: 'mdi-keyboard', config: { type: 'PressKey', key: 'F13' } },
+      { title: 'Eigenes Makro', icon: 'mdi-keyboard-settings', config: { type: 'CustomMacro', key: '' } },
     ]
   },
   {
@@ -252,9 +260,12 @@ const boundActionsList = computed(() => {
     const hasStep = config && 'step' in config;
     const hasKey = config && 'key' in config && type === 'PressKey';
     const hasMediaKey = config && 'key' in config && type === 'MediaControl';
+    const isCustomMacro = config && 'key' in config && type === 'CustomMacro'; // NEU
     const needsProcess = type === 'ToggleAppAudio' || type === 'AppVolume' || type === 'ToggleAppMedia';
     const isAudioToggle = type === 'SwitchAudioDevice';
-    const hasSettings = hasStep || hasKey || hasMediaKey || needsProcess || isAudioToggle;
+
+    // hasSettings um "isCustomMacro" erweitern!
+    const hasSettings = hasStep || hasKey || hasMediaKey || needsProcess || isAudioToggle || isCustomMacro;
 
     return {
       triggerValue: triggerValue as TriggerType,
@@ -264,6 +275,7 @@ const boundActionsList = computed(() => {
       step: config?.step,
       hasKey,
       hasMediaKey,
+      isCustomMacro, // NEU
       key: config?.key,
       needsProcess,
       process_name: config?.process_name,

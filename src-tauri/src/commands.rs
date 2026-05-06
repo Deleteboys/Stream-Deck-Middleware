@@ -22,6 +22,7 @@ use crate::audio::{list_audio_devices, AudioDeviceInfo};
 #[serde(tag = "type")]
 pub enum ActionConfig {
     PressKey { key: String },
+    CustomMacro { key: String },
     MediaControl { key: String },
     SpotifyVolume { step: i8 },
     SwitchAudioDevice { device1: String, device2: String },
@@ -133,6 +134,9 @@ fn create_action(
                 device_b: device2,
             })
         },
+        ActionConfig::CustomMacro { key } => {
+            Box::new(modules::macro_action::CustomMacroAction { keys_string: key })
+        }
         _ => {
             error!("WARNUNG: Aktion noch nicht implementiert!");
             Box::new(modules::press_key_action::PressKeyAction {
