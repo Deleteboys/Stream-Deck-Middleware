@@ -23,7 +23,6 @@
             density="compact"
             width="350"
         >
-          <!-- Wir loopen über die Kategorien -->
           <v-list-group
               v-for="cat in categorizedActions"
               :key="cat.name"
@@ -39,7 +38,6 @@
               ></v-list-item>
             </template>
 
-            <!-- Die eigentlichen Aktionen innerhalb der Kategorie -->
             <v-list-item
                 v-for="a in cat.items"
                 :key="a.title"
@@ -53,7 +51,6 @@
       </v-menu>
     </div>
 
-    <!-- ... restlicher Template Code (v-if boundActionsList etc.) bleibt identisch ... -->
     <div
         v-if="boundActionsList.length === 0"
         class="pa-6 border-dashed rounded-lg border-zinc-700 text-center text-grey mb-6 bg-zinc-800 bg-opacity-30"
@@ -188,7 +185,6 @@ const mediaKeys = [
   { title: 'Mute', value: 'MEDIAMUTE' }
 ];
 
-// Die neue strukturierte Library
 const categorizedActions = [
   {
     name: 'System & Audio',
@@ -219,11 +215,18 @@ const categorizedActions = [
     ]
   },
   {
-    name: 'Streaming & Media',
+    name: 'Spotify Integration',
+    icon: 'mdi-spotify',
+    items: [
+      { title: 'Spotify Volume', icon: 'mdi-volume-high', config: { type: 'SpotifyVolume', step: 5 } },
+      { title: 'Song Liken', icon: 'mdi-heart', config: { type: 'SpotifyLike' } },
+    ]
+  },
+  {
+    name: 'Media Steuerung',
     icon: 'mdi-play-network',
     items: [
       { title: 'Media Control', icon: 'mdi-play-pause', config: { type: 'MediaControl', key: 'MEDIAPLAYPAUSE' } },
-      // { title: 'Spotify Volume', icon: 'mdi-spotify', config: { type: 'SpotifyVolume', step: 5 } },
     ]
   }
 ];
@@ -260,11 +263,10 @@ const boundActionsList = computed(() => {
     const hasStep = config && 'step' in config;
     const hasKey = config && 'key' in config && type === 'PressKey';
     const hasMediaKey = config && 'key' in config && type === 'MediaControl';
-    const isCustomMacro = config && 'key' in config && type === 'CustomMacro'; // NEU
+    const isCustomMacro = config && 'key' in config && type === 'CustomMacro';
     const needsProcess = type === 'ToggleAppAudio' || type === 'AppVolume' || type === 'ToggleAppMedia';
     const isAudioToggle = type === 'SwitchAudioDevice';
 
-    // hasSettings um "isCustomMacro" erweitern!
     const hasSettings = hasStep || hasKey || hasMediaKey || needsProcess || isAudioToggle || isCustomMacro;
 
     return {
@@ -275,7 +277,7 @@ const boundActionsList = computed(() => {
       step: config?.step,
       hasKey,
       hasMediaKey,
-      isCustomMacro, // NEU
+      isCustomMacro,
       key: config?.key,
       needsProcess,
       process_name: config?.process_name,

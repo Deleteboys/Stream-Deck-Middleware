@@ -1,66 +1,65 @@
+use std::fmt;
+use std::fmt::{Debug, Formatter};
 use crate::action::actions::Action;
-use rspotify::{prelude::*, scopes, AuthCodeSpotify, Config, Credentials, OAuth};
-use std::fmt::Debug;
+use rspotify::{prelude::*, AuthCodePkceSpotify};
+use std::sync::Arc;
+use tokio::sync::Mutex as AsyncMutex;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SpotifyVolumeAction {
     pub step: i8,
+    pub spotify: Arc<AsyncMutex<Option<AuthCodePkceSpotify>>>,
+}
+
+impl Debug for SpotifyVolumeAction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SpotifyVolumeAction")
+            .field("step", &self.step)
+            .field("spotify", &"<SpotifyClient>")
+            .finish()
+    }
 }
 
 impl Action for SpotifyVolumeAction {
     fn execute(&self) {
         let step = self.step;
+        let spotify_ptr = Arc::clone(&self.spotify);
 
-        // Da Spotify übers Internet funkt, lagern wir das in einen async Task aus,
-        // damit dein Streamdeck währenddessen nicht einfriert!
+        // Da die API-Abfrage asynchron ist, nutzen wir die Tauri-Runtime
         tauri::async_runtime::spawn(async move {
-            // Lädt die .env Datei (für Client ID & Secret)
-            dotenvy::dotenv().ok();
+            // Sperre den Mutex, um sicher auf den Client zuzugreifen
+            let guard = spotify_ptr.lock().await;
 
-            let creds = Credentials::from_env().unwrap_or_default();
-            let scopes = scopes!("user-modify-playback-state", "user-read-playback-state");
-            let oauth = OAuth::from_env(scopes).unwrap_or_default();
-
-            let config = Config {
-                token_cached: true,
-                ..Default::default()
-            };
-
-            let spotify = AuthCodeSpotify::with_config(creds, oauth, config);
-
-            // Prüfen, ob wir einen Token im Cache haben
-            match spotify.read_token_cache(false).await {
-                Ok(Some(token)) => {
-                    *spotify.get_token().lock().await.unwrap() = Some(token);
-
-                    // 1. Aktuelle Lautstärke auslesen
-                    if let Ok(Some(playback)) = spotify.current_playback(None, None::<Vec<_>>).await
-                    {
-                        // FIX: playback.device ist direkt verfügbar, wir müssen nur schauen,
-                        // ob volume_percent gesetzt ist!
+            if let Some(spotify) = guard.as_ref() {
+                // 1. Aktuelle Wiedergabe abrufen (enthält das aktive Gerät und die Lautstärke)
+                match spotify.current_playback(None, None::<Vec<_>>).await {
+                    Ok(Some(playback)) => {
                         if let Some(current_vol) = playback.device.volume_percent {
-                            // 2. Neue Lautstärke berechnen und zwischen 0 und 100 limitieren (.clamp)
+                            // 2. Neue Lautstärke berechnen (clamp stellt sicher, dass wir zwischen 0 und 100 bleiben)
                             let new_vol = (current_vol as i16 + step as i16).clamp(0, 100) as u8;
 
-                            // 3. Neue Lautstärke setzen
+                            // 3. Neue Lautstärke über die API setzen
                             if let Err(e) = spotify.volume(new_vol, None).await {
-                                println!("Spotify API Fehler: {}", e);
+                                eprintln!("Spotify API Fehler beim Setzen der Lautstärke: {}", e);
                             } else {
                                 println!(
-                                    "Spotify Volume von {}% auf {}% gesetzt",
+                                    "Spotify Volume angepasst: {}% -> {}%",
                                     current_vol, new_vol
                                 );
                             }
                         } else {
-                            println!("Konnte aktuelle Lautstärke nicht auslesen.");
+                            println!("Das aktive Spotify-Gerät meldet keine Lautstärke-Unterstützung.");
                         }
-                    } else {
-                        println!("Kein aktives Gerät in Spotify gefunden. (Läuft Musik?)");
+                    }
+                    Ok(None) => {
+                        println!("Keine aktive Spotify-Wiedergabe gefunden. Läuft gerade Musik?");
+                    }
+                    Err(e) => {
+                        eprintln!("Fehler beim Abrufen der Spotify-Wiedergabe: {}", e);
                     }
                 }
-                _ => {
-                    println!("Kein Spotify Token gefunden! Bitte führe das Login-Script einmal separat aus.");
-                }
+            } else {
+                println!("Spotify-Action abgebrochen: Kein aktiver Login gefunden. Bitte in den Einstellungen einloggen.");
             }
         });
     }

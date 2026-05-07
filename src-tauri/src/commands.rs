@@ -1,22 +1,29 @@
-use std::collections::HashSet;
 use crate::action::actions::{ButtonEvent, EncoderEvent, HardwareTrigger};
+use crate::audio::{list_audio_devices, AudioDeviceInfo};
 use crate::modules;
 use crate::protocol::{HostToPico, IconType};
 use crate::AppState;
+use log::error;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::Duration;
-use log::error;
 use sysinfo::{Disks, ProcessesToUpdate, System};
 use tauri::{AppHandle, Emitter, Manager, State};
 use windows::core::Interface;
-use windows::Win32::Media::Audio::{eConsole, eRender, IAudioSessionControl2, IAudioSessionManager2, IMMDeviceEnumerator, MMDeviceEnumerator};
-use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_APARTMENTTHREADED};
-use crate::audio::{list_audio_devices, AudioDeviceInfo};
+use windows::Win32::Media::Audio::{
+    eConsole, eRender, IAudioSessionControl2, IAudioSessionManager2, IMMDeviceEnumerator,
+    MMDeviceEnumerator,
+};
+use windows::Win32::System::Com::{
+    CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_APARTMENTTHREADED,
+};
 // --- Datenstrukturen für Mappings ---
+
+type SpotifyClientPtr = Arc<tokio::sync::Mutex<Option<rspotify::AuthCodePkceSpotify>>>;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "type")]
@@ -92,6 +99,7 @@ fn parse_key(key_str: &str) -> enigo::Key {
 fn create_action(
     config: ActionConfig,
     tx: mpsc::Sender<HostToPico>,
+    spotify_client: SpotifyClientPtr
 ) -> Box<dyn crate::action::actions::Action> {
     match config {
         ActionConfig::PressKey { key } => Box::new(modules::press_key_action::PressKeyAction {
@@ -101,7 +109,10 @@ fn create_action(
             key: parse_key(&key),
         }),
         ActionConfig::SpotifyVolume { step } => {
-            Box::new(modules::spotify_volume::SpotifyVolumeAction { step })
+            Box::new(modules::spotify_volume::SpotifyVolumeAction {
+                step,
+                spotify: spotify_client,
+            })
         }
         ActionConfig::MasterVolume { step } => {
             Box::new(modules::master_volume::MasterVolumeAction { step, tx })
@@ -133,7 +144,7 @@ fn create_action(
                 device_a: device1,
                 device_b: device2,
             })
-        },
+        }
         ActionConfig::CustomMacro { key } => {
             Box::new(modules::macro_action::CustomMacroAction { keys_string: key })
         }
@@ -230,8 +241,10 @@ pub fn update_mapping(state: State<AppState>, payload: MappingPayload) -> Result
         .clone()
         .ok_or("Keine serielle Verbindung verfügbar")?;
 
+    let spotify_ptr = Arc::clone(&state.spotify_client);
+
     let trigger = trigger_from_payload(&payload.element_id, &payload.trigger_type)?;
-    let action = create_action(payload.action_config, tx);
+    let action = create_action(payload.action_config, tx,spotify_ptr);
 
     if let Ok(mut manager) = state.action_manager.lock() {
         manager.register(trigger, action);
@@ -258,11 +271,13 @@ pub fn sync_mappings(state: State<AppState>, mappings: Vec<MappingPayload>) -> R
         .clone()
         .ok_or("Keine serielle Verbindung verfügbar")?;
 
+    let spotify_ptr = std::sync::Arc::clone(&state.spotify_client);
+
     if let Ok(mut manager) = state.action_manager.lock() {
         manager.clear();
         for payload in mappings {
             if let Ok(trigger) = trigger_from_payload(&payload.element_id, &payload.trigger_type) {
-                let action = create_action(payload.action_config.clone(), tx.clone());
+                let action = create_action(payload.action_config.clone(), tx.clone(),spotify_ptr.clone());
                 manager.register(trigger, action);
             }
         }
@@ -311,16 +326,14 @@ pub fn get_active_audio_processes() -> Vec<String> {
         // COM initialisieren
         if CoInitializeEx(None, COINIT_APARTMENTTHREADED).is_ok() {
             // Wir trennen den Aufruf von der Zuweisung, damit wir den Typ sauber annotieren können
-            let enumerator_result: windows::core::Result<IMMDeviceEnumerator> = CoCreateInstance(
-                &MMDeviceEnumerator,
-                None,
-                CLSCTX_ALL,
-            );
+            let enumerator_result: windows::core::Result<IMMDeviceEnumerator> =
+                CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL);
 
             if let Ok(enumerator) = enumerator_result {
                 if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
                     // Bei .Activate ist die Turbofish-Syntax ::<Type> erlaubt und nötig
-                    if let Ok(manager) = device.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None) {
+                    if let Ok(manager) = device.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None)
+                    {
                         if let Ok(session_enumerator) = manager.GetSessionEnumerator() {
                             let count = session_enumerator.GetCount().unwrap_or(0);
 
@@ -484,9 +497,7 @@ pub fn get_start_minimized(app: AppHandle) -> bool {
 
 #[tauri::command]
 pub fn get_audio_output_devices() -> Result<Vec<AudioDeviceInfo>, String> {
-    unsafe {
-        list_audio_devices().map_err(|e| e.to_string())
-    }
+    unsafe { list_audio_devices().map_err(|e| e.to_string()) }
 }
 
 #[tauri::command]

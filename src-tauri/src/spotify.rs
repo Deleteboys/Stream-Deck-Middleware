@@ -4,12 +4,17 @@ use tauri::{AppHandle, Manager};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::Mutex as AsyncMutex;
+use crate::config;
 
 pub async fn authenticate(
     app: AppHandle,
     client_id: String,
     state_client: Arc<AsyncMutex<Option<AuthCodePkceSpotify>>>,
 ) -> Result<(), String> {
+
+    let mut app_config = config::load_config(&app);
+    app_config.spotify_client_id = Some(client_id.clone());
+    let _ = config::save_config(&app, &app_config);
 
     let mut cache_path = app.path().app_data_dir().map_err(|e| e.to_string())?;
 
@@ -91,4 +96,42 @@ pub async fn authenticate(
     }
 
     Ok(())
+}
+
+
+pub async fn init_from_cache(
+    app: AppHandle,
+    state_client: Arc<AsyncMutex<Option<AuthCodePkceSpotify>>>,
+) {
+    let app_config = config::load_config(&app);
+
+    if let Some(client_id) = app_config.spotify_client_id {
+        if let Ok(mut cache_path) = app.path().app_data_dir() {
+            cache_path.push(".spotify_token");
+
+            if cache_path.exists() {
+                let creds = Credentials::new_pkce(&client_id);
+                let oauth = OAuth {
+                    redirect_uri: "http://127.0.0.1:8888/callback".to_string(),
+                    ..Default::default()
+                };
+
+                let spotify = AuthCodePkceSpotify::with_config(
+                    creds,
+                    oauth,
+                    Config {
+                        token_cached: true,
+                        cache_path,
+                        ..Default::default()
+                    },
+                );
+
+                if let Ok(Some(token)) = spotify.read_token_cache(false).await {
+                    *spotify.get_token().lock().await.unwrap() = Some(token);
+                    *state_client.lock().await = Some(spotify);
+                    println!("Spotify erfolgreich im Hintergrund initialisiert (ID: {}).", client_id);
+                }
+            }
+        }
+    }
 }

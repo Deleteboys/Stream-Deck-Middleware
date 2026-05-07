@@ -1,21 +1,22 @@
 pub mod action;
 mod audio;
 mod commands;
+mod config;
 mod modules;
 mod monitor;
 mod protocol;
 mod serial;
-mod window;
 mod spotify;
+mod window;
 
 use crate::action::manager::ActionManager;
 use crate::protocol::HostToPico;
+use rspotify::AuthCodePkceSpotify;
 use serde::Serialize;
 use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 use std::sync::{mpsc, Arc};
 use std::thread;
-use rspotify::AuthCodePkceSpotify;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{TrayIconBuilder, TrayIconEvent},
@@ -69,19 +70,21 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
-        .plugin(tauri_plugin_log::Builder::new()
-            .targets([
-                Target::new(TargetKind::Stdout),
-                Target::new(TargetKind::Webview),
-            ])
-            .build())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets([
+                    Target::new(TargetKind::Stdout),
+                    Target::new(TargetKind::Webview),
+                ])
+                .build(),
+        )
         .manage(AppState {
             serial_tx: Mutex::new(Some(tx)),
             is_quitting: Mutex::new(false),
             is_device_connected,
             action_manager,
             monitor_slots,
-            spotify_client
+            spotify_client,
         })
         // 2. Den Command fur das Frontend registrieren
         .invoke_handler(tauri::generate_handler![
@@ -166,6 +169,14 @@ pub fn run() {
                     let _ = window.hide();
                 }
             }
+
+            let app_handle = app.handle().clone();
+            let state = app.state::<AppState>();
+            let spotify_ptr = Arc::clone(&state.spotify_client);
+
+            tauri::async_runtime::spawn(async move {
+                spotify::init_from_cache(app_handle, spotify_ptr).await;
+            });
 
             Ok(())
         })
