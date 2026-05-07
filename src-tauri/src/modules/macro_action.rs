@@ -2,6 +2,7 @@ use crate::action::actions::Action;
 use enigo::Direction::{Click, Press, Release};
 use enigo::{Enigo, Key, Keyboard, Settings};
 use log::{debug, warn};
+use std::process::Command;
 
 #[derive(Debug)]
 pub struct CustomMacroAction {
@@ -10,6 +11,23 @@ pub struct CustomMacroAction {
 
 impl Action for CustomMacroAction {
     fn execute(&self) {
+        #[cfg(target_os = "windows")]
+        match self.keys_string.as_str() {
+            "Win + L" => {
+                let _ = Command::new("rundll32.exe")
+                    .args(["user32.dll,LockWorkStation"])
+                    .spawn();
+                debug!("PC nativ gesperrt: {}", self.keys_string);
+                return; // Beendet die Funktion, Enigo wird nicht ausgeführt
+            }
+            "Ctrl + Shift + Esc" => {
+                let _ = Command::new("taskmgr.exe").spawn();
+                debug!("Task-Manager nativ geöffnet: {}", self.keys_string);
+                return; // Beendet die Funktion
+            }
+            _ => {} // Bei allen anderen Strings geht es ganz normal unten weiter
+        }
+
         let mut enigo = Enigo::new(&Settings::default()).unwrap();
 
         let parts: Vec<&str> = self.keys_string.split(" + ").collect();
@@ -61,6 +79,11 @@ fn parse_key_string(s: &str) -> Option<Key> {
         "ARROWDOWN" => Some(Key::DownArrow),
         "ARROWLEFT" => Some(Key::LeftArrow),
         "ARROWRIGHT" => Some(Key::RightArrow),
+        "PrintScreen" => Some(Key::PrintScr),
+        "ScrollLock" => Some(Key::Scroll),
+        "Pause" => Some(Key::Pause),
+        "Insert" => Some(Key::Insert),
+        "ContextMenu" => Some(Key::Apps),
         _ => {
             if s.len() == 1 {
                 let c = s.chars().next().unwrap().to_ascii_lowercase();
