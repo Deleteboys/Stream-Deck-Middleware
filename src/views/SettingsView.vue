@@ -174,7 +174,50 @@
           </div>
         </div>
       </v-card>
+      <div class="mb-4 mt-8">
+        <div class="d-flex align-center text-caption text-primary uppercase tracking-widest font-weight-bold mb-1">
+          <v-icon size="small" class="mr-2">mdi-spotify</v-icon>
+          Spotify Integration
+        </div>
+      </div>
 
+      <v-divider class="mb-6 border-opacity-25" color="white"></v-divider>
+
+      <v-card color="#18181b" variant="flat" class="border border-zinc-800 rounded-lg overflow-hidden mb-8">
+        <div class="px-4 py-4">
+          <div class="d-flex justify-space-between align-center mb-2">
+            <div>
+              <div class="text-body-2 text-grey">Client ID</div>
+              <div class="text-caption text-zinc-500" style="font-size: 0.7rem !important;">
+                Wird für die Authentifizierung über das Spotify Developer Portal benötigt
+              </div>
+            </div>
+            <v-btn
+                variant="tonal"
+                color="primary"
+                size="small"
+                class="text-none"
+                :disabled="!store.spotifyClientId"
+                @click="startSpotifyAuth"
+            >
+              Login
+            </v-btn>
+          </div>
+
+          <v-text-field
+              :model-value="store.spotifyClientId"
+              @update:model-value="store.setSpotifyClientId"
+              variant="outlined"
+              density="compact"
+              hide-details
+              placeholder="Client ID hier einfügen..."
+              base-color="#3f3f46"
+              color="primary"
+              bg-color="#09090b"
+              class="mt-3 font-monospace text-caption"
+          ></v-text-field>
+        </div>
+      </v-card>
     </div>
 
     <v-dialog v-model="showBootloaderDialog" max-width="400" theme="dark">
@@ -212,11 +255,12 @@ import {
   checkFirmwareUpdate,
   downloadAndFlashFirmware,
   requestFirmwareVersion,
-  setStartMinimized, getStartMinimized
+  setStartMinimized, getStartMinimized, startSpotifyLogin
 } from "@/services/streamdeckCommands";
 import {getVersion} from "@tauri-apps/api/app";
 import {emit, listen} from "@tauri-apps/api/event";
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
+import {useStreamDeckStore} from "@/stores/streamdeck";
 
 // UI State Firmware
 const updatePhase = ref(1);
@@ -244,6 +288,21 @@ let unlistenVersion: (() => void) | null = null;
 const autostartEnabled = ref(false);
 
 const startMinimized = ref(false);
+
+const store = useStreamDeckStore();
+
+const startSpotifyAuth = async () => {
+  if (!store.spotifyClientId) return;
+
+  try {
+    console.log("Starte Auth-Flow im Backend...");
+    await startSpotifyLogin(store.spotifyClientId);
+    console.log("Login erfolgreich im State gespeichert!");
+
+  } catch (error) {
+    console.error("Login fehlgeschlagen:", error);
+  }
+};
 
 onMounted(async () => {
   try {

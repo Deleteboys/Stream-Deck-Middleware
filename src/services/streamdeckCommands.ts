@@ -333,3 +333,12 @@ export async function getAudioDevices(): Promise<AudioDeviceInfo[]> {
         return [];
     }
 }
+
+export async function startSpotifyLogin(clientId: string): Promise<void> {
+    try {
+        await invoke("start_spotify_login", { clientId });
+    } catch (error) {
+        console.error("Fehler beim Spotify Login:", error);
+        throw error;
+    }
+}

@@ -54,6 +54,7 @@ type Profile = {
 type PersistedState = {
     currentProfileId: number
     profiles: Profile[]
+    spotifyClientId?: string
 }
 
 const STORAGE_KEY = 'streamdeck-state-v1'
@@ -109,6 +110,7 @@ const persistedState = loadPersistedState()
 export const useStreamDeckStore = defineStore('streamdeck', {
     state: () => ({
         currentProfileId: persistedState?.currentProfileId ?? 0,
+        spotifyClientId: persistedState?.spotifyClientId ?? '',
         selectedElementId: null as string | null,
         isDeviceConnected: false,
         hasUnsavedLedChanges: false,
@@ -141,7 +143,8 @@ export const useStreamDeckStore = defineStore('streamdeck', {
 
             const stateToPersist: PersistedState = {
                 currentProfileId: this.currentProfileId,
-                profiles: this.profiles
+                profiles: this.profiles,
+                spotifyClientId: this.spotifyClientId
             }
 
             try {
@@ -224,6 +227,11 @@ export const useStreamDeckStore = defineStore('streamdeck', {
             this.currentProfileId = id
             this.selectedElementId = null
             this.persistState()
+        },
+
+        setSpotifyClientId(id: string) {
+            this.spotifyClientId = id;
+            this.persistState();
         },
 
         selectElement(id: string | null) {

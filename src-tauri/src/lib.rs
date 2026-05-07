@@ -6,6 +6,7 @@ mod monitor;
 mod protocol;
 mod serial;
 mod window;
+mod spotify;
 
 use crate::action::manager::ActionManager;
 use crate::protocol::HostToPico;
@@ -14,6 +15,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 use std::sync::{mpsc, Arc};
 use std::thread;
+use rspotify::AuthCodePkceSpotify;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{TrayIconBuilder, TrayIconEvent},
@@ -21,6 +23,7 @@ use tauri::{
 };
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_log::{Target, TargetKind};
+use tokio::sync::Mutex as AsyncMutex;
 
 #[derive(serde::Serialize)]
 pub struct ProcessInfo {
@@ -34,6 +37,7 @@ pub struct AppState {
     pub is_device_connected: Arc<AtomicBool>,
     pub action_manager: Arc<Mutex<ActionManager>>,
     pub monitor_slots: Arc<Mutex<[Option<String>; 4]>>,
+    pub spotify_client: Arc<AsyncMutex<Option<AuthCodePkceSpotify>>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -48,6 +52,8 @@ pub fn run() {
 
     let monitor_slots_for_setup = Arc::clone(&monitor_slots);
     let tx_for_monitor = tx.clone();
+
+    let spotify_client = Arc::new(AsyncMutex::new(None));
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -75,6 +81,7 @@ pub fn run() {
             is_device_connected,
             action_manager,
             monitor_slots,
+            spotify_client
         })
         // 2. Den Command fur das Frontend registrieren
         .invoke_handler(tauri::generate_handler![
@@ -91,7 +98,8 @@ pub fn run() {
             commands::update_monitor_mapping,
             commands::set_start_minimized,
             commands::get_start_minimized,
-            commands::get_audio_output_devices
+            commands::get_audio_output_devices,
+            commands::start_spotify_login
         ])
         .setup(move |app| {
             // --- TRAY MENU SETUP ---

@@ -6,7 +6,7 @@ use crate::AppState;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::Duration;
 use log::error;
@@ -487,4 +487,18 @@ pub fn get_audio_output_devices() -> Result<Vec<AudioDeviceInfo>, String> {
     unsafe {
         list_audio_devices().map_err(|e| e.to_string())
     }
+}
+
+#[tauri::command]
+pub async fn start_spotify_login(
+    app: AppHandle, // <--- NEU: Tauri injiziert das automatisch
+    state: tauri::State<'_, AppState>,
+    client_id: String,
+) -> Result<(), String> {
+    let client_ptr = std::sync::Arc::clone(&state.spotify_client);
+
+    // Wir übergeben das 'app' Handle jetzt als ersten Parameter
+    crate::spotify::authenticate(app, client_id, client_ptr).await?;
+
+    Ok(())
 }
