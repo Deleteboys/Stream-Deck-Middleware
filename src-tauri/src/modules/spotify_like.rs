@@ -45,10 +45,11 @@ impl Action for SpotifyLikeAction {
                     // 3. Prüfen, ob es sich um einen Track handelt (und nicht um einen Podcast etc.)
                     if let Some(PlayableItem::Track(track)) = song.item {
                         if let Some(track_id) = track.id {
+                            let track_id_string = track_id.to_string();
                             let track_name = track.name.clone();
                             let library_id = LibraryId::Track(track_id);
 
-                            debug!("Versuche, Track '{}' ({:?}) zur Bibliothek hinzuzufügen...", track_name, library_id);
+                            debug!("Versuche, Track '{}' ({:?}) zur Bibliothek hinzuzufügen...", track_name, track_id_string);
 
                             // 4. Song zur Library hinzufügen
                             match spotify.library_add(vec![library_id]).await {
