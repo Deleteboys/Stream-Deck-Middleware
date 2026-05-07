@@ -40,6 +40,7 @@ pub enum ActionConfig {
     ForegroundVolume { step: i8 },
     ToggleForegroundAudio,
     ToggleAppMedia { process_name: String },
+    SpotifyLikeAction,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -99,7 +100,7 @@ fn parse_key(key_str: &str) -> enigo::Key {
 fn create_action(
     config: ActionConfig,
     tx: mpsc::Sender<HostToPico>,
-    spotify_client: SpotifyClientPtr
+    spotify_client: SpotifyClientPtr,
 ) -> Box<dyn crate::action::actions::Action> {
     match config {
         ActionConfig::PressKey { key } => Box::new(modules::press_key_action::PressKeyAction {
@@ -148,6 +149,9 @@ fn create_action(
         ActionConfig::CustomMacro { key } => {
             Box::new(modules::macro_action::CustomMacroAction { keys_string: key })
         }
+        ActionConfig::SpotifyLikeAction => Box::new(modules::spotify_like::SpotifyLikeAction {
+            spotify: spotify_client,
+        }),
         _ => {
             error!("WARNUNG: Aktion noch nicht implementiert!");
             Box::new(modules::press_key_action::PressKeyAction {
@@ -244,7 +248,7 @@ pub fn update_mapping(state: State<AppState>, payload: MappingPayload) -> Result
     let spotify_ptr = Arc::clone(&state.spotify_client);
 
     let trigger = trigger_from_payload(&payload.element_id, &payload.trigger_type)?;
-    let action = create_action(payload.action_config, tx,spotify_ptr);
+    let action = create_action(payload.action_config, tx, spotify_ptr);
 
     if let Ok(mut manager) = state.action_manager.lock() {
         manager.register(trigger, action);
@@ -277,7 +281,11 @@ pub fn sync_mappings(state: State<AppState>, mappings: Vec<MappingPayload>) -> R
         manager.clear();
         for payload in mappings {
             if let Ok(trigger) = trigger_from_payload(&payload.element_id, &payload.trigger_type) {
-                let action = create_action(payload.action_config.clone(), tx.clone(),spotify_ptr.clone());
+                let action = create_action(
+                    payload.action_config.clone(),
+                    tx.clone(),
+                    spotify_ptr.clone(),
+                );
                 manager.register(trigger, action);
             }
         }

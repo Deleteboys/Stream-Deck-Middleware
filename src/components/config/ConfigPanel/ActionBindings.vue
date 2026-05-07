@@ -219,7 +219,7 @@ const categorizedActions = [
     icon: 'mdi-spotify',
     items: [
       { title: 'Spotify Volume', icon: 'mdi-volume-high', config: { type: 'SpotifyVolume', step: 5 } },
-      { title: 'Song Liken', icon: 'mdi-heart', config: { type: 'SpotifyLike' } },
+      { title: 'Song Liken', icon: 'mdi-heart', config: { type: 'SpotifyLikeAction' } },
     ]
   },
   {

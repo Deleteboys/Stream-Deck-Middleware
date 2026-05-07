@@ -28,7 +28,8 @@ export type ActionConfig =
     | { type: 'AppVolume'; process_name: string; step: number;  }
     | { type: 'ForegroundVolume'; step: number; }
     | { type: 'ToggleForegroundAudio' }
-    | { type: 'SwitchAudioDevice'; device1: string; device2: string };
+    | { type: 'SwitchAudioDevice'; device1: string; device2: string }
+    | { type: 'SpotifyLikeAction';};
 
 export type FirmwareUpdateInfo = {
     version: string;
