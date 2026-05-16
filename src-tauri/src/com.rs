@@ -25,8 +25,11 @@ impl ComGuard {
     }
 
     unsafe fn init(coinit: COINIT) -> Result<Self> {
+        crate::diagnostics::record_com_init_call();
+
         if COM_DEPTH.with(|depth| depth.get()) > 0 {
             COM_DEPTH.with(|depth| depth.set(depth.get() + 1));
+            crate::diagnostics::record_com_reused_init();
             return Ok(Self { active: true });
         }
 
@@ -35,12 +38,14 @@ impl ComGuard {
         if result.is_ok() {
             COM_DEPTH.with(|depth| depth.set(1));
             COM_SHOULD_UNINITIALIZE.with(|should| should.set(true));
+            crate::diagnostics::record_com_real_init();
             return Ok(Self { active: true });
         }
 
         if result == RPC_E_CHANGED_MODE {
             COM_DEPTH.with(|depth| depth.set(1));
             COM_SHOULD_UNINITIALIZE.with(|should| should.set(false));
+            crate::diagnostics::record_com_changed_mode();
             return Ok(Self { active: true });
         }
 
@@ -74,6 +79,7 @@ impl Drop for ComGuard {
             unsafe {
                 CoUninitialize();
             }
+            crate::diagnostics::record_com_uninit();
         }
     }
 }

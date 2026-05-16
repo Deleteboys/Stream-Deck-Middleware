@@ -42,6 +42,7 @@ pub fn start_serial_thread(
                         port.clear(serialport::ClearBuffer::All).ok();
 
                         info!("Serial service connected on {}", port_name);
+                        crate::diagnostics::record_serial_connect();
                         is_device_connected.store(true, Ordering::Relaxed);
                         let _ = app.emit("pico-connection", true);
 
@@ -49,10 +50,14 @@ pub fn start_serial_thread(
                         if let Ok(slice) = postcard::to_slice(&HostToPico::GetConfig, &mut buf) {
                             if let Err(e) = port.write_all(slice).and_then(|_| port.flush()) {
                                 error!("Initial config request failed: {}", e);
+                            } else {
+                                crate::diagnostics::record_serial_host_command_written();
                             }
                         }
                         if let Ok(slice) = postcard::to_slice(&HostToPico::GetVersion, &mut buf) {
-                            let _ = port.write_all(slice).and_then(|_| port.flush());
+                            if port.write_all(slice).and_then(|_| port.flush()).is_ok() {
+                                crate::diagnostics::record_serial_host_command_written();
+                            }
                         }
 
                         current_port = Some(port);
@@ -79,12 +84,15 @@ pub fn start_serial_thread(
                         if let Err(e) = port.write_all(slice).and_then(|_| port.flush()) {
                             error!("Send error: {}", e);
                             is_device_connected.store(false, Ordering::Relaxed);
+                            crate::diagnostics::record_serial_disconnect();
                             let _ = app.emit("pico-connection", false);
                             current_port = None;
                             current_port_name = None;
                             accumulator.clear();
                             thread::sleep(Duration::from_millis(500));
                             continue;
+                        } else {
+                            crate::diagnostics::record_serial_host_command_written();
                         }
                     }
                 }
@@ -98,6 +106,11 @@ pub fn start_serial_thread(
             match port.read(&mut serial_buf) {
                 Ok(bytes_read) if bytes_read > 0 => {
                     accumulator.extend_from_slice(&serial_buf[..bytes_read]);
+                    crate::diagnostics::record_serial_bytes_read(
+                        bytes_read,
+                        accumulator.len(),
+                        accumulator.capacity(),
+                    );
                     if accumulator.len() > MAX_ACCUMULATOR_BYTES {
                         if last_buffer_drop_log.elapsed() >= Duration::from_secs(10) {
                             error!(
@@ -107,6 +120,10 @@ pub fn start_serial_thread(
                             last_buffer_drop_log = Instant::now();
                         }
                         reset_accumulator(&mut accumulator);
+                        crate::diagnostics::record_serial_buffer_drop(
+                            accumulator.len(),
+                            accumulator.capacity(),
+                        );
                         continue;
                     }
 
@@ -114,6 +131,7 @@ pub fn start_serial_thread(
                         match postcard::take_from_bytes::<PicoToHost>(&accumulator) {
                             Ok((msg, rest)) => {
                                 let _ = app.emit("pico-event", msg.clone());
+                                crate::diagnostics::record_serial_pico_event_emit();
 
                                 if let PicoToHost::Version { version } = &msg {
                                     let _ = app.emit("pico-version", version.as_str());
@@ -133,6 +151,10 @@ pub fn start_serial_thread(
                                 }
 
                                 accumulator = rest.to_vec();
+                                crate::diagnostics::record_serial_message(
+                                    accumulator.len(),
+                                    accumulator.capacity(),
+                                );
                             }
                             Err(postcard::Error::DeserializeUnexpectedEnd) => {
                                 if accumulator.len() > MAX_ACCUMULATOR_BYTES {
@@ -141,6 +163,10 @@ pub fn start_serial_thread(
                                 break;
                             }
                             Err(_) => {
+                                crate::diagnostics::record_serial_parse_error(
+                                    accumulator.len(),
+                                    accumulator.capacity(),
+                                );
                                 if !accumulator.is_empty() {
                                     accumulator.remove(0);
                                 } else {
@@ -156,6 +182,7 @@ pub fn start_serial_thread(
                     let port_label = current_port_name.as_deref().unwrap_or("unknown");
                     info!("Connection to {} lost: {}", port_label, e);
                     is_device_connected.store(false, Ordering::Relaxed);
+                    crate::diagnostics::record_serial_disconnect();
                     let _ = app.emit("pico-connection", false);
                     current_port = None;
                     current_port_name = None;
@@ -167,6 +194,8 @@ pub fn start_serial_thread(
             if let Some(ready_id) = tracker.check_long_press_feedback() {
                 if let Err(e) = write_to_pico(port, &HostToPico::Vibrate { pattern: VibrationPattern::Medium }) {
                     error!("Fehler beim Senden des Feedbacks: {}", e);
+                } else {
+                    crate::diagnostics::record_serial_host_command_written();
                 }
             }
         }

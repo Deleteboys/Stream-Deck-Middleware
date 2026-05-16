@@ -518,3 +518,8 @@ pub async fn start_spotify_login(
 
     Ok(())
 }
+
+#[tauri::command]
+pub fn get_runtime_diagnostics() -> crate::diagnostics::RuntimeDiagnostics {
+    crate::diagnostics::snapshot()
+}

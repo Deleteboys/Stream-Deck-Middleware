@@ -3,6 +3,7 @@ mod audio;
 mod com;
 mod commands;
 mod config;
+mod diagnostics;
 mod modules;
 mod monitor;
 mod protocol;
@@ -44,6 +45,8 @@ pub struct AppState {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    diagnostics::init();
+
     let (tx, rx) = mpsc::channel::<HostToPico>();
 
     let action_manager = Arc::new(Mutex::new(ActionManager::new()));
@@ -103,7 +106,8 @@ pub fn run() {
             commands::set_start_minimized,
             commands::get_start_minimized,
             commands::get_audio_output_devices,
-            commands::start_spotify_login
+            commands::start_spotify_login,
+            commands::get_runtime_diagnostics
         ])
         .setup(move |app| {
             // --- TRAY MENU SETUP ---

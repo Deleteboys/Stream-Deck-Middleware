@@ -25,24 +25,25 @@ pub fn start_monitoring(
         let mut last_mutes = [false; 4];
 
         loop {
+            crate::diagnostics::record_audio_tick();
+
             let current_slots = {
                 let guard = state.lock().unwrap();
                 guard.clone()
             };
 
+            let statuses = unsafe { audio::get_monitor_statuses(&current_slots) };
+            if statuses.is_err() {
+                crate::diagnostics::record_audio_status_error();
+            }
+
             for (i, slot_opt) in current_slots.iter().enumerate() {
-                let status_result = unsafe {
-                    match slot_opt {
-                        Some(name) if name == "Windows Master Volume" => {
-                            audio::get_master_status().map(Some)
-                        }
-                        Some(name) if name == "Foreground Process" => {
-                            audio::get_foreground_status()
-                        }
-                        Some(name) => audio::get_process_status(name),
-                        None => Ok(None),
-                    }
-                };
+                if slot_opt.is_some() {
+                    crate::diagnostics::record_audio_slot_poll();
+                }
+
+                let status_result = statuses.as_ref().map(|values| values[i]);
+
                 if let Ok(Some((vol_float, is_muted))) = status_result {
                     let vol_u8 = (vol_float * 100.0) as u8;
                     let slot_idx = i as u8;
@@ -53,6 +54,7 @@ pub fn start_monitoring(
                             slot: slot_idx,
                             volume: vol_u8,
                         });
+                        crate::diagnostics::record_audio_pico_command_sent();
                         last_volumes[i] = vol_u8;
                         changed = true;
                     }
@@ -62,6 +64,7 @@ pub fn start_monitoring(
                             index: slot_idx,
                             mute: is_muted,
                         });
+                        crate::diagnostics::record_audio_pico_command_sent();
                         last_mutes[i] = is_muted;
                         changed = true;
                     }
@@ -76,14 +79,20 @@ pub fn start_monitoring(
                                 muted: last_mutes[i],
                             },
                         );
+                        crate::diagnostics::record_audio_update_emit();
                     }
                 } else {
+                    if let Ok(None) = status_result {
+                        crate::diagnostics::record_audio_empty_result();
+                    }
+
                     if 255 != last_volumes[i] {
                         let slot_index = i as u8;
                         let _ = tx.send(HostToPico::SetVolume {
                             slot: slot_index,
                             volume: 255,
                         });
+                        crate::diagnostics::record_audio_pico_command_sent();
                         last_volumes[i] = 255;
 
                         let _ = app_handle.emit(
@@ -94,10 +103,11 @@ pub fn start_monitoring(
                                 muted: last_mutes[i],
                             },
                         );
+                        crate::diagnostics::record_audio_update_emit();
                     }
                 }
             }
-            thread::sleep(Duration::from_millis(250));
+            thread::sleep(Duration::from_millis(1));
         }
     });
 }

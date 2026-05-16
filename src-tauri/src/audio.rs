@@ -6,6 +6,144 @@ use windows::Win32::System::Com::*;
 use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
 
+struct MonitorSessionStatus {
+    pid: u32,
+    identifier: String,
+    volume: f32,
+    muted: bool,
+}
+
+pub unsafe fn get_monitor_statuses(
+    slots: &[Option<String>; 4],
+) -> windows::core::Result<[Option<(f32, bool)>; 4]> {
+    let mut results = [None; 4];
+
+    if slots.iter().all(Option::is_none) {
+        return Ok(results);
+    }
+
+    let _com = crate::com::ComGuard::init_multithreaded()?;
+    let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+    let device = enumerator.GetDefaultAudioEndpoint(eRender, eConsole)?;
+
+    if slots
+        .iter()
+        .any(|slot| matches!(slot.as_deref(), Some("Windows Master Volume")))
+    {
+        let endpoint_volume: IAudioEndpointVolume = device.Activate(CLSCTX_ALL, None)?;
+        let status = (
+            endpoint_volume.GetMasterVolumeLevelScalar()?,
+            endpoint_volume.GetMute()?.as_bool(),
+        );
+
+        for (index, slot) in slots.iter().enumerate() {
+            if matches!(slot.as_deref(), Some("Windows Master Volume")) {
+                results[index] = Some(status);
+            }
+        }
+    }
+
+    let needs_sessions = slots.iter().any(|slot| {
+        matches!(slot.as_deref(), Some("Foreground Process"))
+            || matches!(slot.as_deref(), Some(name) if name != "Windows Master Volume")
+    });
+
+    if !needs_sessions {
+        crate::diagnostics::record_audio_snapshot(0);
+        return Ok(results);
+    }
+
+    let foreground_pid = if slots
+        .iter()
+        .any(|slot| matches!(slot.as_deref(), Some("Foreground Process")))
+    {
+        foreground_process_id()
+    } else {
+        0
+    };
+
+    let manager: IAudioSessionManager2 =
+        device.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None)?;
+    let session_enumerator = manager.GetSessionEnumerator()?;
+    let session_count = session_enumerator.GetCount()?;
+    let mut sessions = Vec::with_capacity(session_count as usize);
+
+    for index in 0..session_count {
+        let Ok(session) = session_enumerator.GetSession(index) else {
+            continue;
+        };
+        let Ok(session2) = session.cast::<IAudioSessionControl2>() else {
+            continue;
+        };
+        let Ok(simple_volume) = session.cast::<ISimpleAudioVolume>() else {
+            continue;
+        };
+
+        let pid = session2.GetProcessId().unwrap_or(0);
+        use windows::Win32::System::Com::CoTaskMemFree;
+        use std::ffi::c_void;
+
+        let identifier = if let Ok(pwstr) = session2.GetSessionIdentifier() {
+            // 1. Rust-String erstellen
+            let text = pwstr.to_string().unwrap_or_default().to_lowercase();
+
+            // 2. Windows-Speicher freigeben
+            // Hinweis: Je nach Version des windows-Crates muss der Pointer ggf. anders extrahiert werden (z.B. pwstr.0).
+            CoTaskMemFree(Some(pwstr.as_ptr() as *const c_void));
+
+            text
+        } else {
+            String::new()
+        };
+        let volume = simple_volume.GetMasterVolume()?;
+        let muted = simple_volume.GetMute()?.as_bool();
+
+        sessions.push(MonitorSessionStatus {
+            pid,
+            identifier,
+            volume,
+            muted,
+        });
+    }
+    crate::diagnostics::record_audio_snapshot(sessions.len() as u64);
+
+    for (slot_index, slot) in slots.iter().enumerate() {
+        let Some(name) = slot.as_deref() else {
+            continue;
+        };
+
+        if name == "Windows Master Volume" {
+            continue;
+        }
+
+        let matching_session = if name == "Foreground Process" {
+            sessions.iter().find(|session| session.pid == foreground_pid)
+        } else {
+            let needle = name.to_lowercase();
+            sessions
+                .iter()
+                .find(|session| session.identifier.contains(&needle))
+        };
+
+        if let Some(session) = matching_session {
+            results[slot_index] = Some((session.volume, session.muted));
+        }
+    }
+
+    Ok(results)
+}
+
+unsafe fn foreground_process_id() -> u32 {
+    let hwnd = GetForegroundWindow();
+    if hwnd.is_invalid() {
+        return 0;
+    }
+
+    let mut pid: u32 = 0;
+    GetWindowThreadProcessId(hwnd, Some(&mut pid));
+    pid
+}
+
 pub unsafe fn adjust_volume_for_pids(target_pids: &[u32], step: i8) -> windows::core::Result<bool> {
     if target_pids.is_empty() {
         return Ok(false);

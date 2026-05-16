@@ -41,6 +41,52 @@ export type ProcessInfo = {
     name: string;
 };
 
+export type RuntimeDiagnostics = {
+    uptime_secs: number;
+    process: {
+        pid: number;
+        working_set_bytes: number;
+        peak_working_set_bytes: number;
+        private_usage_bytes: number;
+        peak_pagefile_usage_bytes: number;
+        pagefile_usage_bytes: number;
+        paged_pool_bytes: number;
+        nonpaged_pool_bytes: number;
+        page_faults: number;
+        handle_count: number;
+    };
+    serial: {
+        bytes_read: number;
+        messages_decoded: number;
+        parse_errors: number;
+        buffer_drops: number;
+        accumulator_len: number;
+        accumulator_capacity: number;
+        accumulator_max_len: number;
+        connects: number;
+        disconnects: number;
+        pico_events_emitted: number;
+        host_commands_written: number;
+    };
+    audio: {
+        ticks: number;
+        snapshots: number;
+        sessions_enumerated: number;
+        slot_polls: number;
+        status_errors: number;
+        empty_results: number;
+        updates_emitted: number;
+        pico_commands_sent: number;
+    };
+    com: {
+        init_calls: number;
+        real_inits: number;
+        reused_inits: number;
+        changed_mode_results: number;
+        uninits: number;
+    };
+};
+
 export type LedEffectCommand =
     | {
     Solid: {
@@ -342,4 +388,8 @@ export async function startSpotifyLogin(clientId: string): Promise<void> {
         console.error("Fehler beim Spotify Login:", error);
         throw error;
     }
+}
+
+export async function getRuntimeDiagnostics(): Promise<RuntimeDiagnostics> {
+    return await invoke<RuntimeDiagnostics>("get_runtime_diagnostics");
 }
